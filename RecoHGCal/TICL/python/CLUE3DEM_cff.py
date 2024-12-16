@@ -11,7 +11,7 @@ filteredLayerClustersCLUE3DEM = _filteredLayerClustersProducer.clone(
     min_cluster_size = 2, # inclusive
     iteration_label = "CLUE3DEM",
     algo_number = [6,7],
-    max_layerId = 28, # inclusive
+    max_layerId = 26, # inclusive
 )
 
 # PATTERN RECOGNITION
