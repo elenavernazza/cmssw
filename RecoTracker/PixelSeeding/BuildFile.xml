@@ -23,6 +23,7 @@
 <use name="RecoTracker/TkMSParametrization"/>
 <use name="RecoTracker/TkTrackingRegions"/>
 <use name="TrackingTools/DetLayers"/>
+<use name="SimTracker/TrackerHitAssociation"/>
 <use name="vdt_headers"/>
 <export>
   <lib name="1"/>
