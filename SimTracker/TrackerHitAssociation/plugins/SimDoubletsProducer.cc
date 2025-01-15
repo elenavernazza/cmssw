@@ -25,7 +25,7 @@
 #include "DataFormats/TrackerRecHit2D/interface/OmniClusterRef.h"            // include OmniClusterRef
 #include "SimDataFormats/TrackingAnalysis/interface/TrackingParticle.h"      // includes input data format: TrackingParticleCollection, TrackingParticle
 
-#include "RecoTracker/PixelSeeding/interface/SimDoublets.h"
+#include "SimDataFormats/TrackingAnalysis/interface/SimDoublets.h"
 
 #include <cstddef>
 #include <iostream>

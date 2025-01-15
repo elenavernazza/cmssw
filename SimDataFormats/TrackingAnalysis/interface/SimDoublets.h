@@ -1,5 +1,5 @@
-#ifndef RecoTracker_PixelSeeding_SimDoublets_h
-#define RecoTracker_PixelSeeding_SimDoublets_h
+#ifndef SimDataFormats_TrackingAnalysis_SimDoublets_h
+#define SimDataFormats_TrackingAnalysis_SimDoublets_h
 
 
 #include "DataFormats/TrackerRecHit2D/interface/SiPixelRecHitCollection.h"   // includes input data format: RecHit collection 

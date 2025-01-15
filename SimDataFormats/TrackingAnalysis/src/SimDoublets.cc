@@ -1,4 +1,4 @@
-#include "RecoTracker/PixelSeeding/interface/SimDoublets.h"
+#include "SimDataFormats/TrackingAnalysis/interface/SimDoublets.h"
 
 #include "Geometry/CommonTopologies/interface/SimplePixelTopology.h"
 #include "DataFormats/TrackerCommon/interface/TrackerTopology.h"

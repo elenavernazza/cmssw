@@ -1,9 +1,4 @@
 <lcgdict>
   <class name="IntermediateHitTriplets" persistent="false"/>
   <class name="edm::Wrapper<IntermediateHitTriplets>" persistent="false"/>
-
-  <class name="SimDoublets"/>
-  <class name="std::vector<SimDoublets>"/>
-  <class name="edm::Wrapper< std::vector<SimDoublets> >"/>
-  <class name="SiPixelRecHitRefVector"/>
 </lcgdict>
