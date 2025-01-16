@@ -28,15 +28,24 @@ namespace simdoublets {
 
 
     // function that gets the global position of a RecHit based on its Cluster position
-    GlobalPoint getGlobalHitPosition(SiPixelRecHitRef const& recHit, const TrackerGeometry* trackerGeometry) {
+    GlobalPoint getGlobalHitPosition(SiPixelRecHitRef const& recHit, const TrackerGeometry* trackerGeometry, bool const useClusterLocalPosition = false) {
         // get DetUnit of the RecHit
         DetId detIdObject(recHit->geographicalId());
         const GeomDetUnit* geomDetUnit = trackerGeometry->idToDetUnit(detIdObject);
 
-        // get position from cluster local position and DetUnit global position
-        auto cluster = recHit->cluster();
-        MeasurementPoint measurementPoint(cluster->x(), cluster->y());
-        LocalPoint localPosition = geomDetUnit->topology().localPosition(measurementPoint);
+        LocalPoint localPosition;
+
+        // if use local position of the cluster is set
+        if (useClusterLocalPosition) {
+            // get position from cluster local position and DetUnit global position
+            auto cluster = recHit->cluster();
+            MeasurementPoint measurementPoint(cluster->x(), cluster->y());
+            localPosition = geomDetUnit->topology().localPosition(measurementPoint);
+        }
+        // else, use the local position of the RecHit
+        else {
+            localPosition = recHit->localPositionFast();
+        }        
 
         return geomDetUnit->surface().toGlobal(localPosition);
     }
@@ -67,7 +76,7 @@ namespace simdoublets {
 
 
     // function that, for a pair of two layers, determines the pair index that is used in the true reconstruction;
-    // if that layer pair is not considered in reconstruction, return -1
+    // if that layer pair is not considered in reconstruction, return -(innerLayerId * nLayers + outerLayerId)
     int getLayerPairId(std::pair<uint8_t, uint8_t> const& layerIds) {
 
         // first, convert the 1 to 212 ranged layer Id into the reco range 0 to 27
@@ -84,6 +93,12 @@ namespace simdoublets {
             }
         }
 
+        // if layerPairId was not found in reco pairs (<=> it's still -1),
+        // set it to -(innerLayerId * nLayers + outerLayerId)
+        if (layerPairId == -1) {
+            layerPairId = - (innerLayerId * pixelTopology::Phase2::numberOfLayers + outerLayerId);
+        }
+
         return layerPairId;
     }
 
@@ -92,8 +107,9 @@ namespace simdoublets {
 
 
 
-SimDoublets::Doublet::Doublet(SimDoublets const& simDoublets, size_t const innerIndex, size_t const outerIndex, const TrackerGeometry* trackerGeometry) : 
+SimDoublets::Doublet::Doublet(SimDoublets const& simDoublets, size_t const innerIndex, size_t const outerIndex, const TrackerGeometry* trackerGeometry, bool useClusterLocalPosition) : 
     trackerGeometry_(trackerGeometry),
+    useClusterLocalPosition_(useClusterLocalPosition),
     trackingParticleRef_(simDoublets.trackingParticle())
 {
     // fill recHits and layers
@@ -108,13 +124,48 @@ SimDoublets::Doublet::Doublet(SimDoublets const& simDoublets, size_t const inner
 }
 
 
+SimDoublets::Doublet::Doublet(SimDoublets const& simDoublets, size_t const innerIndex, size_t const outerIndex, const TrackerGeometry* trackerGeometry) :
+    SimDoublets::Doublet::Doublet(simDoublets, innerIndex, outerIndex, trackerGeometry, true) {
+    // make sure, that there are RecHits
+    if (simDoublets.numRecHits() == 0) {
+        return;
+    }
+
+    // check if the local position of the RecHit makes sense or is always (0,0,0)
+    // background is that the local position of RecHit is transient, and therefore not saved to ROOT files
+    // for the check look at the local position of the first RecHit
+    SiPixelRecHitRef recHit = simDoublets.recHits(0);
+    if ((recHit->localPositionFast().x()==0) && (recHit->localPositionFast().y()==0)) {
+        // if local position is 0, use clusters instead
+        useClusterLocalPosition_ = true;
+    } else {
+        // else, prefer to use the RecHit position (as this is what's used in reco)
+        useClusterLocalPosition_ = false;
+    }
+}
+
+
+
+GlobalPoint SimDoublets::Doublet::innerGlobalPos() const {
+    // get the inner RecHit's global position
+    return simdoublets::getGlobalHitPosition(recHitRefs_.first, trackerGeometry_, useClusterLocalPosition_);
+}
+
+
+
+GlobalPoint SimDoublets::Doublet::outerGlobalPos() const {
+    // get the outer RecHit's global position
+    return simdoublets::getGlobalHitPosition(recHitRefs_.second, trackerGeometry_, useClusterLocalPosition_);
+}
+
+
 
 void SimDoublets::sortRecHits(const TrackerGeometry* trackerGeometry) {
     // get the vector of squared magnitudes of the global RecHit positions
     std::vector<double> recHitMag2;
     recHitMag2.reserve(layerIdVector_.size());
     for (const auto& recHit : recHitRefVector_) {
-        Global3DPoint globalPosition = simdoublets::getGlobalHitPosition(recHit, trackerGeometry);
+        Global3DPoint globalPosition = simdoublets::getGlobalHitPosition(recHit, trackerGeometry, true);
         recHitMag2.push_back(globalPosition.mag2());
     }
 

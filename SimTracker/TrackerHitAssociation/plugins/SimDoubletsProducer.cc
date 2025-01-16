@@ -209,17 +209,6 @@ void SimDoubletsProducer::produce(edm::Event& event, const edm::EventSetup& even
           if (selectedTrackingParticleKeys.has(assocTrackingParticle.key())) {
             SiPixelRecHitRef hitRef = edmNew::makeRefTo(hits, &hit);
 
-            // if (count<10){
-            //   auto localPos = hit.localPosition();
-            //   std::cout << "local position (RecHit) =" << localPos << "and ";
-            //   // auto globalPos = geomDetUnit->surface().toGlobal(localPos);
-            //   // std::cout << "global position (RecHit) = (" << globalPos.x() << ", " << globalPos.y() << ", " << globalPos.z() << ") and ";
-            //   // auto localPosClusX = hit.cluster()->x();
-            //   // auto localPosClusY = hit.cluster()->y();
-            //   // std::cout << "cluster position = (" << localPosClusX << ", " << localPosClusY << ")" << std::endl;
-            // }
-            
-
             // loop over collection of SimDoublets and find the one of the associated TrackingParticle
             for (auto& simDoublets : simDoubletsCollection){
               TrackingParticleRef trackingParticleRef = simDoublets.trackingParticle();
