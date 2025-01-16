@@ -2,7 +2,7 @@
 
 #include "Geometry/CommonTopologies/interface/SimplePixelTopology.h"
 #include "DataFormats/TrackerCommon/interface/TrackerTopology.h"
-#include "DataFormats/GeometryCommonDetAlgo/interface/MeasurementPoint.h"    // includes MeasurementPoint
+#include "DataFormats/GeometryCommonDetAlgo/interface/MeasurementPoint.h"
 #include "Geometry/TrackerGeometryBuilder/interface/TrackerGeometry.h"
 
 namespace simdoublets {
@@ -16,12 +16,12 @@ namespace simdoublets {
         }
         // if layer is in backward direction (101,112)
         else if (layerIdRange1to212 < 200) {
-            // subtract  to get to (16,27)
+            // subtract 85 to get to (16,27)
             return (layerIdRange1to212 - 85);
         }
         // if layer is in backward direction (201,212)
         else {
-            // subtract  to get to (4,15)
+            // subtract 197 to get to (4,15)
             return (layerIdRange1to212 - 197);
         }
     }
@@ -200,6 +200,7 @@ std::vector<SimDoublets::Doublet> SimDoublets::getSimDoublets(const TrackerGeome
     // create output vector for the doublets
     std::vector<SimDoublets::Doublet> doubletVector;
 
+    // FIXME maybe change to assertion or error?
     // confirm that the RecHits are sorted
     if (!recHitsAreSorted_){
         return doubletVector;

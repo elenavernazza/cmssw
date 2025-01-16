@@ -2,7 +2,7 @@
 #define SimDataFormats_TrackingAnalysis_SimDoublets_h
 
 
-#include "DataFormats/TrackerRecHit2D/interface/SiPixelRecHitCollection.h"   // includes input data format: RecHit collection 
+#include "DataFormats/TrackerRecHit2D/interface/SiPixelRecHitCollection.h" 
 #include "SimDataFormats/TrackingAnalysis/interface/TrackingParticleFwd.h"
 #include "Geometry/TrackerGeometryBuilder/interface/TrackerGeometry.h"
 #include "Geometry/CommonDetUnit/interface/PixelGeomDetUnit.h"
@@ -31,6 +31,17 @@ typedef edm::RefVector<SiPixelRecHitCollection, SiPixelRecHit> SiPixelRecHitRefV
  * left in the detector. These SimDoublets::Doublet objects can be used to optimize the 
  * doublet creation in the reconstruction.
  *
+ * The Doublets are generated as the RecHit pairs between two consecutively hit layers.
+ * I.e., if a TrackingParticle produces
+ *  - 1 hit (A) in 1st layer
+ *  - 2 hits (B, C) in 3rd layer
+ *  - 1 hit (D) in 4th layer
+ * then, the true Doublets are:
+ *  (A-B), (A-C), (B-D) and (C-D).
+ * So, neither does it matter that the 2nd layer got "skipped" as there are no hits,
+ * nor is the Doublet of (A-D) formed since there is a layer with hits in between.
+ * Doublets are not created between hits within the same layer.
+ *
  * @author Jan Schulz (jan.gerrit.schulz@cern.ch)
  * @date January 2025
  */
@@ -49,9 +60,10 @@ public:
         // default constructor
         Doublet() {}
 
-        // constructors
+        // constructor with explicit setting of useClusterLocalPosition_
         Doublet(SimDoublets const&, size_t const, size_t const, const TrackerGeometry*, bool);
-
+        // constrcutor with automatic setting of useClusterLocalPosition_
+        // checks if RecHit localPosition is meaningful: if yes, prefer RecHit localPosition over cluster
         Doublet(SimDoublets const&, size_t const, size_t const, const TrackerGeometry*);
 
         // method to access the layers pair
@@ -151,10 +163,10 @@ public:
     std::vector<Doublet> getSimDoublets(const TrackerGeometry* trackerGeometry = nullptr) const;
 
 private:
-    TrackingParticleRef trackingParticleRef_;               // reference to the TrackingParticle
-    SiPixelRecHitRefVector recHitRefVector_;                // reference vector to RecHits associated to the TP (sorted afer building)
-    std::vector<uint8_t> layerIdVector_;                    // vector of layer IDs corresponding to the RecHits
-    bool recHitsAreSorted_ {false};                         // true if RecHits were sorted
+    TrackingParticleRef trackingParticleRef_;   // reference to the TrackingParticle
+    SiPixelRecHitRefVector recHitRefVector_;    // reference vector to RecHits associated to the TP (sorted afer building)
+    std::vector<uint8_t> layerIdVector_;        // vector of layer IDs corresponding to the RecHits
+    bool recHitsAreSorted_ {false};             // true if RecHits were sorted
 };
 
 
