@@ -1,0 +1,59 @@
+"""
+This script runs the harvesting step.
+"""
+
+import FWCore.ParameterSet.Config as cms
+
+from Configuration.Eras.Era_Phase2C17I13M9_cff import Phase2C17I13M9
+
+process = cms.Process('HARVESTING',Phase2C17I13M9)
+
+# import of standard configurations
+process.load('Configuration.StandardSequences.Services_cff')
+process.load('SimGeneral.HepPDTESSource.pythiapdt_cfi')
+process.load('FWCore.MessageService.MessageLogger_cfi')
+process.load('Configuration.EventContent.EventContent_cff')
+process.load('SimGeneral.MixingModule.mixNoPU_cfi')
+process.load('Configuration.Geometry.GeometryExtendedRun4D110Reco_cff')
+process.load('Configuration.StandardSequences.MagneticField_38T_cff')
+process.load('Configuration.StandardSequences.EDMtoMEAtRunEnd_cff')
+process.load('Configuration.StandardSequences.Harvesting_cff')
+process.load('Configuration.StandardSequences.FrontierConditions_GlobalTag_cff')
+
+process.maxEvents = cms.untracked.PSet(
+    input = cms.untracked.int32(1)
+)
+
+# Input source
+process.source = cms.Source("PoolSource",
+    fileNames = cms.untracked.vstring('file:simDoublets_TEST.root')
+)
+
+process.options = cms.untracked.PSet(
+    Rethrow = cms.untracked.vstring('ProductNotFound'),
+    fileMode = cms.untracked.string('FULLMERGE')
+)
+
+# Production Info
+process.configurationMetadata = cms.untracked.PSet(
+    version = cms.untracked.string('$Revision: 1.19 $'),
+    annotation = cms.untracked.string('step4 nevts:100'),
+    name = cms.untracked.string('Applications')
+)
+
+# Output definition
+
+# Additional output definition
+
+# Other statements
+from Configuration.AlCa.GlobalTag import GlobalTag
+process.GlobalTag = GlobalTag(process.GlobalTag, 'auto:phase2_realistic_T33', '')
+
+# Path and EndPath definitions
+process.edmtome_step = cms.Path(process.EDMtoME)
+process.dqmsave_step = cms.Path(process.DQMSaver)
+process.load('DQM.SiTrackerPhase2.Phase2TrackerDQMHarvesting_cff')
+
+# Schedule definition
+process.schedule = cms.Schedule(process.edmtome_step,process.dqmsave_step)
+
