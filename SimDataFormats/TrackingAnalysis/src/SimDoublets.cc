@@ -75,29 +75,15 @@ namespace simdoublets {
     }
 
 
-    // function that, for a pair of two layers, determines the pair index that is used in the true reconstruction;
-    // if that layer pair is not considered in reconstruction, return -(innerLayerId * nLayers + outerLayerId)
+    // function that, for a pair of two layers, gives a unique pair Id (innerLayerId * 100 + outerLayerId)
     int getLayerPairId(std::pair<uint8_t, uint8_t> const& layerIds) {
 
         // first, convert the 1 to 212 ranged layer Id into the reco range 0 to 27
         uint8_t innerLayerId = convertLayerIdToRange0to27(layerIds.first);
         uint8_t outerLayerId = convertLayerIdToRange0to27(layerIds.second);
 
-        // then, loop through all layer pairs considered in the reconstruction
-        // and find the one corresponding to the present pair
-        int layerPairId = -1;
-        for (size_t i=0; i < pixelTopology::Phase2::nPairs; i++) {
-            if ((pixelTopology::Phase2::layerPairs[2*i] == innerLayerId) && (pixelTopology::Phase2::layerPairs[2*i+1] == outerLayerId)) {
-                layerPairId = i;
-                break;
-            }
-        }
-
-        // if layerPairId was not found in reco pairs (<=> it's still -1),
-        // set it to -(innerLayerId * nLayers + outerLayerId)
-        if (layerPairId == -1) {
-            layerPairId = - (innerLayerId * pixelTopology::Phase2::numberOfLayers + outerLayerId);
-        }
+        // calculate the unique layer pair Id as (innerLayerId * 100 + outerLayerId)
+        int layerPairId = (innerLayerId * 100 + outerLayerId);
 
         return layerPairId;
     }

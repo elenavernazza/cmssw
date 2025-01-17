@@ -35,9 +35,6 @@
 #include <typeinfo>
 
 
-// FIXME: move typedef in separate script
-// collection of SimDoublets
-typedef std::vector<SimDoublets> SimDoubletsCollection;
 
 
 

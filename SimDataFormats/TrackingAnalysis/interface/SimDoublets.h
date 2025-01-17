@@ -86,6 +86,16 @@ public:
             return layerPairId_;
         }
 
+        // method to access the inner layerId
+        uint8_t innerLayerId() const {
+            return layerIds_.first;
+        }
+        
+        // method to access the outer layerId
+        uint8_t outerLayerId() const {
+            return layerIds_.second;
+        }
+
         // method to access the inner RecHit
         SiPixelRecHitRef innerRecHit() const {
             return recHitRefs_.first;
@@ -168,6 +178,10 @@ private:
     std::vector<uint8_t> layerIdVector_;        // vector of layer IDs corresponding to the RecHits
     bool recHitsAreSorted_ {false};             // true if RecHits were sorted
 };
+
+
+// collection of SimDoublets
+typedef std::vector<SimDoublets> SimDoubletsCollection;
 
 
 #endif
