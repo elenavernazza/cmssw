@@ -1,3 +1,5 @@
+#include "DataFormats/GeometryVector/interface/GlobalPoint.h"
+#include "DataFormats/GeometryVector/interface/GlobalVector.h"
 #include "DataFormats/TrackerRecHit2D/interface/SiPixelRecHit.h"
 #include "FWCore/Framework/interface/Event.h"
 #include "FWCore/Framework/interface/Frameworkfwd.h"
@@ -63,6 +65,7 @@ private:
   const edm::EDGetTokenT<ClusterTPAssociation> clusterTPAssociation_getToken_;
   const edm::EDGetTokenT<TrackingParticleCollection> trackingParticles_getToken_;
   const edm::EDGetTokenT<SiPixelRecHitCollection> pixelRecHits_getToken_;
+  const edm::EDGetTokenT<reco::BeamSpot> beamSpot_getToken_;
   const edm::EDPutTokenT<SimDoubletsCollection> simDoublets_putToken_;
 };
 
@@ -76,6 +79,7 @@ SimDoubletsProducer::SimDoubletsProducer(const edm::ParameterSet& pSet)
       clusterTPAssociation_getToken_(consumes<ClusterTPAssociation>(pSet.getParameter<edm::InputTag>("clusterTPAssociationSrc"))),
       trackingParticles_getToken_(consumes(pSet.getParameter<edm::InputTag>("trackingParticleSrc"))),
       pixelRecHits_getToken_(consumes(pSet.getParameter<edm::InputTag>("pixelRecHitSrc"))),
+      beamSpot_getToken_(consumes(pSet.getParameter<edm::InputTag>("beamSpotSrc"))),
       simDoublets_putToken_(produces<SimDoubletsCollection>()) {
 
   // initialize the selector for TrackingParticles used to create SimHitDoublets
@@ -107,6 +111,7 @@ void SimDoubletsProducer::fillDescriptions(edm::ConfigurationDescriptions& descr
   desc.add<edm::InputTag>("clusterTPAssociationSrc", edm::InputTag("hltTPClusterProducer"));
   desc.add<edm::InputTag>("trackingParticleSrc", edm::InputTag("mix", "MergedTrackTruth"));
   desc.add<edm::InputTag>("pixelRecHitSrc", edm::InputTag("hltSiPixelRecHits"));
+  desc.add<edm::InputTag>("beamSpotSrc", edm::InputTag("hltOnlineBeamSpot"));
 
   // FIXME : maybe move those settings to a separate file
   // parameter set for the selection of TrackingParticles that will be used for SimHitDoublets
@@ -159,6 +164,13 @@ void SimDoubletsProducer::produce(edm::Event& event, const edm::EventSetup& even
   if (!trackingParticles.isValid()){
     return;
   }
+  
+  // get Beam Spot from the event
+  edm::Handle<reco::BeamSpot> beamSpot;
+  event.getByToken(beamSpot_getToken_, beamSpot);
+  if (!beamSpot.isValid()){
+    return;
+  }
 
   // create collection of SimDoublets
   // each element will correspond to one selected TrackingParticle
@@ -171,7 +183,7 @@ void SimDoubletsProducer::produce(edm::Event& event, const edm::EventSetup& even
 
     // select reasonable TrackingParticles for the study (e.g., only signal)
     if (trackingParticleSelector(trackingParticle)){
-      simDoubletsCollection.push_back(SimDoublets(TrackingParticleRef(trackingParticles, i)));
+      simDoubletsCollection.push_back(SimDoublets(TrackingParticleRef(trackingParticles, i), *beamSpot));
     }
   }
 
