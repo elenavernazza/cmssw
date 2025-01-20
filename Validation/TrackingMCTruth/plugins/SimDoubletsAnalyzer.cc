@@ -61,8 +61,13 @@ private:
   MonitorElement* h_layerPairId_;
   MonitorElement* h_numSkippedLayers_;
   MonitorElement* h_z0_;
+  MonitorElement* h_sizeY_;
+  MonitorElement* h_curvatureR_;
+  MonitorElement* h_pTFromR_;
+  MonitorElement* h_dsizeY_;
   std::vector<MonitorElement*> hVector_dr_;
   std::vector<MonitorElement*> hVector_dphi_;
+  std::vector<MonitorElement*> hVector_innerZ_;
   int eventCount_ = 0;
 };
 
@@ -119,10 +124,13 @@ void SimDoubletsAnalyzer::analyze(const edm::Event& iEvent, const edm::EventSetu
       // RecHit properties
       auto inner_r = doublet.innerGlobalPos().perp();
       auto inner_z = doublet.innerGlobalPos().z();
-      auto inner_phi = doublet.innerGlobalPos().barePhi(); // returns float, whereas .phi() returns phi object
+      auto inner_phi = doublet.innerGlobalPos().barePhi();  // returns float, whereas .phi() returns phi object
       auto outer_r = doublet.outerGlobalPos().perp();
       auto outer_z = doublet.outerGlobalPos().z();
       auto outer_phi = doublet.outerGlobalPos().barePhi();
+
+      auto dr = outer_r - inner_r;
+      auto dphi = reco::deltaPhi(inner_phi, outer_phi);
 
       // ----------------------------------------------------------
       // layer pair independent plots (main folder)
@@ -130,7 +138,13 @@ void SimDoubletsAnalyzer::analyze(const edm::Event& iEvent, const edm::EventSetu
 
       h_layerPairId_->Fill(doublet.innerLayerId(), doublet.outerLayerId());
       h_numSkippedLayers_->Fill(doublet.numSkippedLayers());
-      h_z0_->Fill(std::abs(inner_r * outer_z - inner_z * outer_r) / (outer_r - inner_r));
+      // impact parameter histogram
+      h_z0_->Fill(std::abs(inner_r * outer_z - inner_z * outer_r) / dr);
+      // cluster size y histogram
+      h_sizeY_->Fill(doublet.innerRecHit()->cluster()->sizeY());
+      auto curvature = 1.f / 4.f * ((dr / dphi) * (dr / dphi) + (dr));
+      h_curvatureR_->Fill(curvature);
+      h_pTFromR_->Fill(curvature / 87.78f);
 
       // ----------------------------------------------------------
       // layer pair dependent plots (sub-folders for layer pairs)
@@ -146,10 +160,13 @@ void SimDoubletsAnalyzer::analyze(const edm::Event& iEvent, const edm::EventSetu
       int layerPairIdIndex = layerPairId2Index.at(layerPairId);
 
       // dr histogram
-      hVector_dr_[layerPairIdIndex]->Fill(outer_r - inner_r);
+      hVector_dr_[layerPairIdIndex]->Fill(dr);
 
       // dphi histogram
-      hVector_dphi_[layerPairIdIndex]->Fill(reco::deltaPhi(inner_phi, outer_phi));
+      hVector_dphi_[layerPairIdIndex]->Fill(dphi);
+
+      // inner z histogram
+      hVector_innerZ_[layerPairIdIndex]->Fill(inner_z);
     }
   }
 }
@@ -163,14 +180,37 @@ void SimDoubletsAnalyzer::bookHistograms(DQMStore::IBooker& ibook, edm::Run cons
   h_numSkippedLayers_ = ibook.book1D(
       "numSkippedLayers", "Number of skipped layers; Number of skipped layers; Number of SimDoublets", 16, -1.5, 14.5);
   h_z0_ = ibook.book1D("z0", "z0; z0 [cm]; Number of SimDoublets", 51, -1, 50);
+  h_sizeY_ = ibook.book1D("sizeY", "Cluster Size Y; Cluster Size Y ; Number of SimDoublets", 51, -1, 50);
+  h_curvatureR_ =
+      ibook.book1D("curvatureR", "Curvature Radius; Curvature Radius [cm] ; Number of SimDoublets", 40, -20, 20);
+  h_pTFromR_ = ibook.book1D(
+      "pTFromR", "Transverse Momentum from curvature; Transverse Momentum [GeV] ; Number of SimDoublets", 500, 0, 1000);
+  h_dsizeY_ = ibook.book1D(
+      "dsizeY", "Cluster Size Y Difference between outer and inner RecHit ; Cluster Size Y Difference ; Number of SimDoublets", 51, -1, 50);
 
-  //
+  // booking the vector of histograms for each valid layer pair
   for (auto id = layerPairId2Index.begin(); id != layerPairId2Index.end(); ++id) {
-    ibook.setCurrentFolder(folder_ + "/layerPair_" + std::to_string(id->first));
-    hVector_dr_.emplace_back(
-        ibook.book1D("dr", "dr of RecHit pair; dr between outer and inner RecHit [cm]; Number of SimDoublets", 31, -1, 30));
+    std::string index = std::to_string(id->first);
+    std::string name;
+    if (index.size() < 3) {
+      name = "0_" + index;
+    } else if (index.size() == 3) {
+      name = index.substr(0, 1) + "_" + index.substr(1, 3);
+    } else {
+      name = index.substr(0, 2) + "_" + index.substr(2, 4);
+    }
+
+    ibook.setCurrentFolder(folder_ + "/lp_" + name);
+    hVector_dr_.emplace_back(ibook.book1D(
+        "dr", "dr of RecHit pair; dr between outer and inner RecHit [cm]; Number of SimDoublets", 31, -1, 30));
     hVector_dphi_.emplace_back(
-        ibook.book1D("dphi", "dphi of RecHit pair; d#phi between outer and inner RecHit [rad]; Number of SimDoublets", 50, -M_PI, M_PI));
+        ibook.book1D("dphi",
+                     "dphi of RecHit pair; d#phi between outer and inner RecHit [rad]; Number of SimDoublets",
+                     50,
+                     -M_PI,
+                     M_PI));
+    hVector_innerZ_.emplace_back(
+        ibook.book1D("innerZ", "z of the inner RecHit; z of inner RecHit [cm]; Number of SimDoublets", 100, -300, 300));
   }
 }
 
