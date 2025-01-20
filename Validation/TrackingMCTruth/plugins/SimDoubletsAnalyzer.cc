@@ -17,6 +17,8 @@
 //
 
 #include <string>
+#include <map>
+#include <vector>
 
 // user include files
 #include "DataFormats/Histograms/interface/MonitorElementCollection.h"
@@ -58,6 +60,7 @@ private:
   MonitorElement* h_layerPairId_;
   MonitorElement* h_numSkippedLayers_;
   MonitorElement* h_z0_;
+  std::vector<MonitorElement*> hVector_dr_;
   int eventCount_ = 0;
 };
 
@@ -68,6 +71,14 @@ private:
 //
 // static data member definitions
 //
+static const std::map<int, int> layerPairId2Index{
+    {1, 0},     {102, 1},   {203, 2},   {405, 3},   {506, 4},   {607, 5},   {708, 6},   {809, 7},   {910, 8},
+    {1011, 9},  {1112, 10}, {1213, 11}, {1314, 12}, {1415, 13}, {1617, 14}, {1718, 15}, {1819, 16}, {1920, 17},
+    {2021, 18}, {2122, 19}, {2223, 20}, {2324, 21}, {2425, 22}, {2526, 23}, {2627, 24}, {2, 25},    {103, 26},
+    {406, 27},  {507, 28},  {608, 29},  {709, 30},  {810, 31},  {911, 32},  {1012, 33}, {1113, 34}, {1214, 35},
+    {1315, 36}, {1618, 37}, {1719, 38}, {1820, 39}, {1921, 40}, {2022, 41}, {2123, 42}, {2224, 43}, {2325, 44},
+    {2426, 45}, {2527, 46}, {4, 47},    {104, 48},  {204, 49},  {5, 50},    {105, 51},  {205, 52},  {16, 53},
+    {116, 54},  {216, 55},  {17, 56},   {117, 57},  {217, 58}};
 
 //
 // constructors and destructor
@@ -103,15 +114,22 @@ void SimDoubletsAnalyzer::analyze(const edm::Event& iEvent, const edm::EventSetu
   for (auto const& simDoublets : simDoubletsCollection) {
     auto doublets = simDoublets.getSimDoublets(trackerGeometry_);
     for (auto const& doublet : doublets) {
+      int layerPairId = doublet.layerPairId();
+
       h_layerPairId_->Fill(doublet.innerLayerId(), doublet.outerLayerId());
       h_numSkippedLayers_->Fill(doublet.numSkippedLayers());
-      auto inner_r = std::sqrt(doublet.innerGlobalPos().x() * doublet.innerGlobalPos().x() +
-                               doublet.innerGlobalPos().y() * doublet.innerGlobalPos().y());
+      auto inner_r = doublet.innerGlobalPos().perp();
       auto inner_z = doublet.innerGlobalPos().z();
-      auto outer_r = std::sqrt(doublet.outerGlobalPos().x() * doublet.outerGlobalPos().x() +
-                               doublet.outerGlobalPos().y() * doublet.outerGlobalPos().y());
+      auto outer_r = doublet.outerGlobalPos().perp();
       auto outer_z = doublet.outerGlobalPos().z();
-      h_z0_->Fill(std::abs(inner_r*outer_z-inner_z*outer_r)/(outer_r-inner_r));
+      h_z0_->Fill(std::abs(inner_r * outer_z - inner_z * outer_r) / (outer_r - inner_r));
+
+      if (layerPairId2Index.find(layerPairId) == layerPairId2Index.end()) {
+        continue;
+      }
+      int layerPairIdIndex = layerPairId2Index.at(layerPairId);
+      // dr histogram
+      hVector_dr_[layerPairIdIndex]->Fill(outer_r - inner_r);
     }
   }
 }
@@ -124,7 +142,14 @@ void SimDoubletsAnalyzer::bookHistograms(DQMStore::IBooker& ibook, edm::Run cons
       ibook.book2D("layerPairs", "Layer pairs; Inner layer ID; Outer layer ID", 28, -0.5, 27.5, 28, -0.5, 27.5);
   h_numSkippedLayers_ = ibook.book1D(
       "numSkippedLayers", "Number of skipped layers; Number of skipped layers; Number of SimDoublets", 16, -1.5, 14.5);
-  h_z0_ = ibook.book1D("z0", "z0; z0; Number of SimDoublets", 50, -30, 30);
+  h_z0_ = ibook.book1D("z0", "z0; z0 [cm]; Number of SimDoublets", 51, -1, 50);
+
+  //
+  for (auto id = layerPairId2Index.begin(); id != layerPairId2Index.end(); ++id) {
+    ibook.setCurrentFolder(folder_ + "/layerPair_" + std::to_string(id->first));
+    hVector_dr_.emplace_back(
+        ibook.book1D("dr", "dr of RecHit pair; dr between outer and inner RecHit [cm]; Number of SimDoublets", 31, -1, 30));
+  }
 }
 
 void SimDoubletsAnalyzer::fillDescriptions(edm::ConfigurationDescriptions& descriptions) {
