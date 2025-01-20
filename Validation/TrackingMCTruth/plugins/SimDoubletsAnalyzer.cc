@@ -50,13 +50,14 @@ private:
   void analyze(const edm::Event&, const edm::EventSetup&) override;
 
   // ------------ member data ------------
-  
+
   const TrackerGeometry* trackerGeometry_ = nullptr;
   const edm::ESGetToken<TrackerGeometry, TrackerDigiGeometryRecord> geometry_getToken_;
   const edm::EDGetTokenT<SimDoubletsCollection> simDoublets_getToken_;
   std::string folder_;
   MonitorElement* h_layerPairId_;
   MonitorElement* h_numSkippedLayers_;
+  MonitorElement* h_z0_;
   int eventCount_ = 0;
 };
 
@@ -83,7 +84,6 @@ SimDoubletsAnalyzer::~SimDoubletsAnalyzer() {
   // (e.g. close files, deallocate resources etc.)
 }
 
-
 //
 // member functions
 // ----------------
@@ -91,7 +91,6 @@ SimDoubletsAnalyzer::~SimDoubletsAnalyzer() {
 void SimDoubletsAnalyzer::dqmBeginRun(const edm::Run& iRun, const edm::EventSetup& iSetup) {
   trackerGeometry_ = &iSetup.getData(geometry_getToken_);
 }
-
 
 void SimDoubletsAnalyzer::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup) {
   using namespace edm;
@@ -106,22 +105,27 @@ void SimDoubletsAnalyzer::analyze(const edm::Event& iEvent, const edm::EventSetu
     for (auto const& doublet : doublets) {
       h_layerPairId_->Fill(doublet.innerLayerId(), doublet.outerLayerId());
       h_numSkippedLayers_->Fill(doublet.numSkippedLayers());
+      auto inner_r = std::sqrt(doublet.innerGlobalPos().x() * doublet.innerGlobalPos().x() +
+                               doublet.innerGlobalPos().y() * doublet.innerGlobalPos().y());
+      auto inner_z = doublet.innerGlobalPos().z();
+      auto outer_r = std::sqrt(doublet.outerGlobalPos().x() * doublet.outerGlobalPos().x() +
+                               doublet.outerGlobalPos().y() * doublet.outerGlobalPos().y());
+      auto outer_z = doublet.outerGlobalPos().z();
+      h_z0_->Fill(std::abs(inner_r*outer_z-inner_z*outer_r)/(outer_r-inner_r));
     }
   }
 }
 
-
-void SimDoubletsAnalyzer::bookHistograms(DQMStore::IBooker& ibook,
-                                    edm::Run const& run,
-                                    edm::EventSetup const& iSetup) {
+void SimDoubletsAnalyzer::bookHistograms(DQMStore::IBooker& ibook, edm::Run const& run, edm::EventSetup const& iSetup) {
   ibook.setCurrentFolder(folder_);
 
-  // booking the histograms  
-  h_layerPairId_ = ibook.book2D("layerPairs", "Layer pairs; Inner layer ID; Outer layer ID", 28, -0.5, 27.5, 28, -0.5, 27.5);
-  h_numSkippedLayers_ = ibook.book1D("numSkippedLayers", "Number of skipped layers; Number of skipped layers; Number of SimDoublets", 16, -1.5, 14.5);
+  // booking the histograms
+  h_layerPairId_ =
+      ibook.book2D("layerPairs", "Layer pairs; Inner layer ID; Outer layer ID", 28, -0.5, 27.5, 28, -0.5, 27.5);
+  h_numSkippedLayers_ = ibook.book1D(
+      "numSkippedLayers", "Number of skipped layers; Number of skipped layers; Number of SimDoublets", 16, -1.5, 14.5);
+  h_z0_ = ibook.book1D("z0", "z0; z0; Number of SimDoublets", 50, -30, 30);
 }
-
-
 
 void SimDoubletsAnalyzer::fillDescriptions(edm::ConfigurationDescriptions& descriptions) {
   // The following says we do not know what parameters are allowed so do no
