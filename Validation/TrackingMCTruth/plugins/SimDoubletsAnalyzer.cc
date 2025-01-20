@@ -22,6 +22,7 @@
 
 // user include files
 #include "DataFormats/Histograms/interface/MonitorElementCollection.h"
+#include "DataFormats/Math/interface/deltaPhi.h"
 #include "SimDataFormats/TrackingAnalysis/interface/SimDoublets.h"
 #include "Geometry/Records/interface/TrackerDigiGeometryRecord.h"
 #include "FWCore/Framework/interface/Frameworkfwd.h"
@@ -61,6 +62,7 @@ private:
   MonitorElement* h_numSkippedLayers_;
   MonitorElement* h_z0_;
   std::vector<MonitorElement*> hVector_dr_;
+  std::vector<MonitorElement*> hVector_dphi_;
   int eventCount_ = 0;
 };
 
@@ -114,22 +116,40 @@ void SimDoubletsAnalyzer::analyze(const edm::Event& iEvent, const edm::EventSetu
   for (auto const& simDoublets : simDoubletsCollection) {
     auto doublets = simDoublets.getSimDoublets(trackerGeometry_);
     for (auto const& doublet : doublets) {
-      int layerPairId = doublet.layerPairId();
+      // RecHit properties
+      auto inner_r = doublet.innerGlobalPos().perp();
+      auto inner_z = doublet.innerGlobalPos().z();
+      auto inner_phi = doublet.innerGlobalPos().barePhi(); // returns float, whereas .phi() returns phi object
+      auto outer_r = doublet.outerGlobalPos().perp();
+      auto outer_z = doublet.outerGlobalPos().z();
+      auto outer_phi = doublet.outerGlobalPos().barePhi();
+
+      // ----------------------------------------------------------
+      // layer pair independent plots (main folder)
+      // ----------------------------------------------------------
 
       h_layerPairId_->Fill(doublet.innerLayerId(), doublet.outerLayerId());
       h_numSkippedLayers_->Fill(doublet.numSkippedLayers());
-      auto inner_r = doublet.innerGlobalPos().perp();
-      auto inner_z = doublet.innerGlobalPos().z();
-      auto outer_r = doublet.outerGlobalPos().perp();
-      auto outer_z = doublet.outerGlobalPos().z();
       h_z0_->Fill(std::abs(inner_r * outer_z - inner_z * outer_r) / (outer_r - inner_r));
 
+      // ----------------------------------------------------------
+      // layer pair dependent plots (sub-folders for layer pairs)
+      // ----------------------------------------------------------
+
+      // first, get layer pair Id and exclude layer pairs that are not considered
+      int layerPairId = doublet.layerPairId();
       if (layerPairId2Index.find(layerPairId) == layerPairId2Index.end()) {
         continue;
       }
+
+      // get the position of the layer pair in the vectors of histograms
       int layerPairIdIndex = layerPairId2Index.at(layerPairId);
+
       // dr histogram
       hVector_dr_[layerPairIdIndex]->Fill(outer_r - inner_r);
+
+      // dphi histogram
+      hVector_dphi_[layerPairIdIndex]->Fill(reco::deltaPhi(inner_phi, outer_phi));
     }
   }
 }
@@ -149,6 +169,8 @@ void SimDoubletsAnalyzer::bookHistograms(DQMStore::IBooker& ibook, edm::Run cons
     ibook.setCurrentFolder(folder_ + "/layerPair_" + std::to_string(id->first));
     hVector_dr_.emplace_back(
         ibook.book1D("dr", "dr of RecHit pair; dr between outer and inner RecHit [cm]; Number of SimDoublets", 31, -1, 30));
+    hVector_dphi_.emplace_back(
+        ibook.book1D("dphi", "dphi of RecHit pair; d#phi between outer and inner RecHit [rad]; Number of SimDoublets", 50, -M_PI, M_PI));
   }
 }
 
