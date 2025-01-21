@@ -54,6 +54,9 @@ namespace ALPAKA_ACCELERATOR_NAMESPACE::caPixelDoublets {
               const float ptCut,
               const int minYSizeB1,
               const int minYSizeB2,
+              const int maxDYSize12,
+              const int maxDYSize,
+              const int maxDYPred,
               const std::vector<int>& phiCutsV,
               const std::vector<int>& minzCutV,
               const std::vector<int>& maxzCutV)
@@ -64,7 +67,10 @@ namespace ALPAKA_ACCELERATOR_NAMESPACE::caPixelDoublets {
           z0Cut_(z0Cut),
           ptCut_(ptCut),
           minYSizeB1_(minYSizeB1),
-          minYSizeB2_(minYSizeB2) {
+          minYSizeB2_(minYSizeB2),
+          maxDYSize12_(maxDYSize12),
+          maxDYSize_(maxDYSize),
+          maxDYPred_(maxDYPred) {
       assert(phiCutsV.size() == T::nPairs);
       std::copy(phiCutsV.begin(), phiCutsV.end(), &phiCuts[0]);
       assert(minzCutV.size() == T::nPairs);
@@ -83,6 +89,10 @@ namespace ALPAKA_ACCELERATOR_NAMESPACE::caPixelDoublets {
 
     const int minYSizeB1_;
     const int minYSizeB2_;
+
+    const int maxDYSize12_;
+    const int maxDYSize_;
+    const int maxDYPred_;
 
     int phiCuts[T::nPairs];
     int minzCut_[T::nPairs];
@@ -113,10 +123,10 @@ namespace ALPAKA_ACCELERATOR_NAMESPACE::caPixelDoublets {
 
       if (not innerBarrel and not onlyBarrel)
         return false;
-      auto dy = innerB1 ? T::maxDYsize12 : T::maxDYsize;
+      auto dy = innerB1 ? maxDYSize12_ : maxDYSize_;
 
       return onlyBarrel ? so > 0 && std::abs(so - mes) > dy
-                        : innerBarrel && std::abs(mes - int(std::abs(dz / dr) * T::dzdrFact + 0.5f)) > T::maxDYPred;
+                        : innerBarrel && std::abs(mes - int(std::abs(dz / dr) * T::dzdrFact + 0.5f)) > maxDYPred_;
     }
 
     template <typename TAcc>

@@ -65,6 +65,9 @@ namespace ALPAKA_ACCELERATOR_NAMESPACE {
       desc.add<std::vector<int>>("cellMaxz", std::vector<int>(55, 20))->setComment("Maximum z for each layer pair");
       desc.add<int>("cellMinYSizeB1", 25)->setComment("Minimum cluster size for B1");
       desc.add<int>("cellMinYSizeB2", 15)->setComment("Minimum cluster size for B2");
+      desc.add<int>("cellMaxDYSize12", 12)->setComment("Maximum cluster size difference for B1/B2");
+      desc.add<int>("cellMaxDYSize", 10)->setComment("Maximum cluster size difference");
+      desc.add<int>("cellMaxDYPred", 20)->setComment("Maximum cluster size difference prediction");
     }
 
     AlgoParams makeCommonParams(edm::ParameterSet const& cfg) {
@@ -156,6 +159,9 @@ namespace ALPAKA_ACCELERATOR_NAMESPACE {
                                       (float)cfg.getParameter<double>("cellPtCut"),
                                       cfg.getParameter<int>("cellMinYSizeB1"),
                                       cfg.getParameter<int>("cellMinYSizeB2"),
+                                      cfg.getParameter<int>("cellMaxDYSize12"),
+                                      cfg.getParameter<int>("cellMaxDYSize"),
+                                      cfg.getParameter<int>("cellMaxDYPred"),
                                       cfg.getParameter<std::vector<int>>("phiCuts"),
                                       cfg.getParameter<std::vector<int>>("cellMinz"),
                                       cfg.getParameter<std::vector<int>>("cellMaxz")};
