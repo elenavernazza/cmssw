@@ -52,6 +52,8 @@ namespace ALPAKA_ACCELERATOR_NAMESPACE::caPixelDoublets {
               const bool idealConditions,
               const float z0Cut,
               const float ptCut,
+              const int minYSizeB1,
+              const int minYSizeB2,
               const std::vector<int>& phiCutsV,
               const std::vector<int>& minzCutV,
               const std::vector<int>& maxzCutV)
@@ -60,7 +62,9 @@ namespace ALPAKA_ACCELERATOR_NAMESPACE::caPixelDoublets {
           doPtCut_(doPtCut),
           idealConditions_(idealConditions),
           z0Cut_(z0Cut),
-          ptCut_(ptCut) {
+          ptCut_(ptCut),
+          minYSizeB1_(minYSizeB1),
+          minYSizeB2_(minYSizeB2) {
       assert(phiCutsV.size() == T::nPairs);
       std::copy(phiCutsV.begin(), phiCutsV.end(), &phiCuts[0]);
       assert(minzCutV.size() == T::nPairs);
@@ -69,13 +73,16 @@ namespace ALPAKA_ACCELERATOR_NAMESPACE::caPixelDoublets {
       std::copy(maxzCutV.begin(), maxzCutV.end(), &maxzCut_[0]);
     }
 
-    bool doClusterCut_;
-    bool doZ0Cut_;
-    bool doPtCut_;
-    bool idealConditions_;  //this is actually not used by phase2
+    const bool doClusterCut_;
+    const bool doZ0Cut_;
+    const bool doPtCut_;
+    const bool idealConditions_;  //this is actually not used by phase2
 
-    float z0Cut_;  //FIXME: check if could be const now
-    float ptCut_;
+    const float z0Cut_;  //FIXME: check if could be const now
+    const float ptCut_;
+
+    const int minYSizeB1_;
+    const int minYSizeB2_;
 
     int phiCuts[T::nPairs];
     int minzCut_[T::nPairs];
@@ -127,11 +134,11 @@ namespace ALPAKA_ACCELERATOR_NAMESPACE::caPixelDoublets {
       auto mes = (!innerB1) || isOuterLadder ? hh[i].clusterSizeY() : -1;
 
       if (innerB1)  // B1
-        if (mes > 0 && mes < T::minYsizeB1)
+        if (mes > 0 && mes < minYSizeB1_)
           return true;                                                                 // only long cluster  (5*8)
       bool innerB2 = (mi >= T::last_bpix1_detIndex) && (mi < T::last_bpix2_detIndex);  //FIXME number
       if (innerB2)                                                                     // B2 and F1
-        if (mes > 0 && mes < T::minYsizeB2)
+        if (mes > 0 && mes < minYSizeB2_)
           return true;
 
       return false;

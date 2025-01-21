@@ -61,8 +61,10 @@ namespace ALPAKA_ACCELERATOR_NAMESPACE {
       desc.add<bool>("doSharedHitCut", true)->setComment("Sharing hit nTuples cleaning");
       desc.add<bool>("dupPassThrough", false)->setComment("Do not reject duplicate");
       desc.add<bool>("useSimpleTripletCleaner", true)->setComment("use alternate implementation");
-      desc.add<std::vector<int>>("minz", std::vector<int>(55, -20))->setComment("Minimum z for each layer pair");
-      desc.add<std::vector<int>>("maxz", std::vector<int>(55, 20))->setComment("Maximum z for each layer pair");
+      desc.add<std::vector<int>>("cellMinz", std::vector<int>(55, -20))->setComment("Minimum z for each layer pair");
+      desc.add<std::vector<int>>("cellMaxz", std::vector<int>(55, 20))->setComment("Maximum z for each layer pair");
+      desc.add<int>("cellMinYSizeB1", 25)->setComment("Minimum cluster size for B1");
+      desc.add<int>("cellMinYSizeB2", 15)->setComment("Minimum cluster size for B2");
     }
 
     AlgoParams makeCommonParams(edm::ParameterSet const& cfg) {
@@ -152,9 +154,11 @@ namespace ALPAKA_ACCELERATOR_NAMESPACE {
                                       cfg.getParameter<bool>("idealConditions"),
                                       (float)cfg.getParameter<double>("cellZ0Cut"),
                                       (float)cfg.getParameter<double>("cellPtCut"),
+                                      cfg.getParameter<int>("cellMinYSizeB1"),
+                                      cfg.getParameter<int>("cellMinYSizeB2"),
                                       cfg.getParameter<std::vector<int>>("phiCuts"),
-                                      cfg.getParameter<std::vector<int>>("minz"),
-                                      cfg.getParameter<std::vector<int>>("maxz")};
+                                      cfg.getParameter<std::vector<int>>("cellMinz"),
+                                      cfg.getParameter<std::vector<int>>("cellMaxz")};
     }
 
   }  // namespace

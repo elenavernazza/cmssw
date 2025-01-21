@@ -34,6 +34,8 @@ hltPhase2PixelTracksSoA = cms.EDProducer('CAHitNtupletAlpakaPhase2@alpaka',
         -173, -199, -229, 28, 35, 44, 55, 70, 87, 113, -23, -30,
         -39, -50, -65, -82, -109
     ),
+    cellMinYSizeB1 = cms.double(25),
+    cellMinYSizeB2 = cms.double(15),
     maxNumberOfDoublets = cms.uint32(5*512*1024),
     minHitsForSharingCut = cms.uint32(10),
     fitNas4 = cms.bool(False),
