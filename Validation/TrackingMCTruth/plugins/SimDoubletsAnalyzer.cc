@@ -61,13 +61,16 @@ private:
   MonitorElement* h_layerPairId_;
   MonitorElement* h_numSkippedLayers_;
   MonitorElement* h_z0_;
-  MonitorElement* h_sizeY_;
   MonitorElement* h_curvatureR_;
   MonitorElement* h_pTFromR_;
-  MonitorElement* h_dsizeY_;
+  MonitorElement* h_sizeYinnerB1_;
+  MonitorElement* h_sizeYinnerB2_;
   std::vector<MonitorElement*> hVector_dr_;
   std::vector<MonitorElement*> hVector_dphi_;
   std::vector<MonitorElement*> hVector_innerZ_;
+  std::vector<MonitorElement*> hVector_sizeY_;
+  std::vector<MonitorElement*> hVector_dsizeYonlyBarrel_;
+  std::vector<MonitorElement*> hVector_dsizeYinnerBarrel_;
   int eventCount_ = 0;
 };
 
@@ -129,6 +132,7 @@ void SimDoubletsAnalyzer::analyze(const edm::Event& iEvent, const edm::EventSetu
       auto outer_z = doublet.outerGlobalPos().z();
       auto outer_phi = doublet.outerGlobalPos().barePhi();
 
+      auto dz = outer_z - inner_z;
       auto dr = outer_r - inner_r;
       auto dphi = reco::deltaPhi(inner_phi, outer_phi);
 
@@ -140,8 +144,6 @@ void SimDoubletsAnalyzer::analyze(const edm::Event& iEvent, const edm::EventSetu
       h_numSkippedLayers_->Fill(doublet.numSkippedLayers());
       // impact parameter histogram
       h_z0_->Fill(std::abs(inner_r * outer_z - inner_z * outer_r) / dr);
-      // cluster size y histogram
-      h_sizeY_->Fill(doublet.innerRecHit()->cluster()->sizeY());
       auto curvature = 1.f / 4.f * ((dr / dphi) * (dr / dphi) + (dr));
       h_curvatureR_->Fill(curvature);
       h_pTFromR_->Fill(curvature / 87.78f);
@@ -167,6 +169,43 @@ void SimDoubletsAnalyzer::analyze(const edm::Event& iEvent, const edm::EventSetu
 
       // inner z histogram
       hVector_innerZ_[layerPairIdIndex]->Fill(inner_z);
+
+      // cluster size y histogram
+      hVector_sizeY_[layerPairIdIndex]->Fill(doublet.innerRecHit()->cluster()->sizeY());
+
+      DetId detIdObject(doublet.innerRecHit()->geographicalId());
+      const GeomDetUnit* geomDetUnit = trackerGeometry_->idToDetUnit(detIdObject);
+      const uint32_t moduleId = geomDetUnit->index();
+      bool innerInB1 = (doublet.innerLayerId() == 0);
+      bool innerInB2 = (doublet.innerLayerId() == 1);
+      bool isOuterLadder = (0 == (moduleId / 8) % 2);
+      bool innerInBarrel = (doublet.innerLayerId() < 4);
+      bool bothInBarrel = innerInBarrel && (doublet.outerLayerId() < 4);
+
+      // cluster size in local y
+      if (innerInB1 && isOuterLadder) {
+        h_sizeYinnerB1_->Fill(doublet.innerRecHit()->cluster()->sizeY());
+      }
+      if (innerInB2) {
+        h_sizeYinnerB2_->Fill(doublet.innerRecHit()->cluster()->sizeY());
+      }
+
+      if (bothInBarrel) {
+        auto realDsizeY =
+            std::abs(doublet.innerRecHit()->cluster()->sizeY() - doublet.outerRecHit()->cluster()->sizeY());
+        if (innerInB1 && isOuterLadder) {
+          hVector_dsizeYonlyBarrel_[layerPairIdIndex]->Fill(realDsizeY);
+        } else if (!innerInB1) {
+          hVector_dsizeYonlyBarrel_[layerPairIdIndex]->Fill(realDsizeY);
+        }
+      } else if (innerInBarrel) {
+        int projectedDsizeY = std::abs(doublet.innerRecHit()->cluster()->sizeY() -
+                                       int(std::abs(dz / dr) * 8.f * 0.0285f / 0.015f + 0.5f));
+        hVector_dsizeYinnerBarrel_[layerPairIdIndex]->Fill(std::abs(
+            doublet.innerRecHit()->cluster()->sizeY() - int(std::abs(dz / dr) * 8.f * 0.0285f / 0.015f + 0.5f)));
+        std::cout << layerPairId << " " << projectedDsizeY << " "
+                  << hVector_dsizeYinnerBarrel_[layerPairIdIndex]->getEntries() << std::endl;
+      }
     }
   }
 }
@@ -180,37 +219,84 @@ void SimDoubletsAnalyzer::bookHistograms(DQMStore::IBooker& ibook, edm::Run cons
   h_numSkippedLayers_ = ibook.book1D(
       "numSkippedLayers", "Number of skipped layers; Number of skipped layers; Number of SimDoublets", 16, -1.5, 14.5);
   h_z0_ = ibook.book1D("z0", "z0; z0 [cm]; Number of SimDoublets", 51, -1, 50);
-  h_sizeY_ = ibook.book1D("sizeY", "Cluster Size Y; Cluster Size Y ; Number of SimDoublets", 51, -1, 50);
   h_curvatureR_ =
       ibook.book1D("curvatureR", "Curvature Radius; Curvature Radius [cm] ; Number of SimDoublets", 40, -20, 20);
   h_pTFromR_ = ibook.book1D(
       "pTFromR", "Transverse Momentum from curvature; Transverse Momentum [GeV] ; Number of SimDoublets", 500, 0, 1000);
-  h_dsizeY_ = ibook.book1D(
-      "dsizeY", "Cluster Size Y Difference between outer and inner RecHit ; Cluster Size Y Difference ; Number of SimDoublets", 51, -1, 50);
+
+  h_sizeYinnerB1_ =
+      ibook.book1D("sizeYinnerB1", "Cluster Size Y (inner from B1); Cluster Size Y; Number of SimDoublets", 51, -1, 50);
+  h_sizeYinnerB2_ =
+      ibook.book1D("sizeYinnerB2", "Cluster Size Y (inner from B2); Cluster Size Y; Number of SimDoublets", 51, -1, 50);
 
   // booking the vector of histograms for each valid layer pair
   for (auto id = layerPairId2Index.begin(); id != layerPairId2Index.end(); ++id) {
     std::string index = std::to_string(id->first);
+    // name of the sub-folder: "lp_${innerLayerId}_${outerLayerId}"
     std::string name;
+    std::string innerLayerName;
+    std::string outerLayerName;
     if (index.size() < 3) {
-      name = "0_" + index;
+      innerLayerName = "0";
+      outerLayerName = index;
     } else if (index.size() == 3) {
-      name = index.substr(0, 1) + "_" + index.substr(1, 3);
+      innerLayerName = index.substr(0, 1);
+      if (index.substr(1, 2) == "0") {
+        outerLayerName = index.substr(2, 3);
+      } else {
+        outerLayerName = index.substr(1, 3);
+      }
     } else {
-      name = index.substr(0, 2) + "_" + index.substr(2, 4);
+      innerLayerName = index.substr(0, 2);
+      if (index.substr(2, 3) == "0") {
+        outerLayerName = index.substr(3, 4);
+      } else {
+        outerLayerName = index.substr(2, 4);
+      }
     }
+    name = "/lp_" + innerLayerName + "_" + outerLayerName;
 
-    ibook.setCurrentFolder(folder_ + "/lp_" + name);
+    // layer mentioning in histogram titles
+    std::string layerTitle = "(layers (" + innerLayerName + "," + outerLayerName + "))";
+
+    ibook.setCurrentFolder(folder_ + name);
     hVector_dr_.emplace_back(ibook.book1D(
-        "dr", "dr of RecHit pair; dr between outer and inner RecHit [cm]; Number of SimDoublets", 31, -1, 30));
-    hVector_dphi_.emplace_back(
-        ibook.book1D("dphi",
-                     "dphi of RecHit pair; d#phi between outer and inner RecHit [rad]; Number of SimDoublets",
-                     50,
-                     -M_PI,
-                     M_PI));
+        "dr",
+        "dr of RecHit pair " + layerTitle + "; dr between outer and inner RecHit [cm]; Number of SimDoublets",
+        31,
+        -1,
+        30));
+    hVector_dphi_.emplace_back(ibook.book1D(
+        "dphi",
+        "dphi of RecHit pair " + layerTitle + "; d#phi between outer and inner RecHit [rad]; Number of SimDoublets",
+        50,
+        -M_PI,
+        M_PI));
     hVector_innerZ_.emplace_back(
-        ibook.book1D("innerZ", "z of the inner RecHit; z of inner RecHit [cm]; Number of SimDoublets", 100, -300, 300));
+        ibook.book1D("innerZ",
+                     "z of the inner RecHit " + layerTitle + "; z of inner RecHit [cm]; Number of SimDoublets",
+                     100,
+                     -300,
+                     300));
+
+    hVector_dsizeYonlyBarrel_.emplace_back(ibook.book1D("dsizeYonlyBarrel",
+                                                        "Cluster Size Y Difference between outer and inner RecHit " +
+                                                            layerTitle +
+                                                            "; Cluster Size Y Difference ; Number of SimDoublets",
+                                                        51,
+                                                        -1,
+                                                        50));
+
+    hVector_dsizeYinnerBarrel_.emplace_back(
+        ibook.book1D("dsizeYinnerBarrel",
+                     "Projected Cluster Size Y Difference between outer and inner RecHit " + layerTitle +
+                         "; Cluster Size Y Difference ; Number of SimDoublets",
+                     51,
+                     -1,
+                     50));
+
+    hVector_sizeY_.emplace_back(
+        ibook.book1D("sizeY", "Cluster Size Y " + layerTitle + "; Cluster Size Y ; Number of SimDoublets", 51, -1, 50));
   }
 }
 

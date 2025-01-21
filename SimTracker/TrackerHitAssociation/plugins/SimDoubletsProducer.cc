@@ -19,6 +19,7 @@
 #include "Geometry/TrackerGeometryBuilder/interface/TrackerGeometry.h"
 #include "Geometry/CommonTopologies/interface/SimplePixelTopology.h"
 #include "DataFormats/TrackerCommon/interface/TrackerTopology.h"
+#include "DataFormats/SiPixelDetId/interface/PixelSubdetector.h"
 
 #include "SimTracker/Common/interface/TrackingParticleSelector.h"            // include the selector for TrackingParticles
 #include "SimTracker/TrackerHitAssociation/interface/ClusterTPAssociation.h" // include cluster to TrackingParticle association
@@ -200,8 +201,22 @@ void SimDoubletsProducer::produce(edm::Event& event, const edm::EventSetup& even
   int count_totRecHits = 0;
   int count = 0;
   for (const auto& detSet : *hits) {
-    // get layer Id
-    unsigned int const layerId = trackerTopology_->getITPixelLayerNumber(detSet.detId());
+    // determine layer Id
+    const DetId &detId = detSet.detId();
+    unsigned int layerId {999};
+
+    if (detId.subdetId() == PixelSubdetector::PixelBarrel) {
+      // subtract 1 to get to (0,3)
+      layerId = trackerTopology_->pxbLayer(detId) - 1;
+    } else if (detId.subdetId() == PixelSubdetector::PixelEndcap) {
+      if (trackerTopology_->pxfSide(detId) == 1) {
+        // add 15 to get to (16,27)
+        layerId = 15 + trackerTopology_->pxfDisk(detId);
+      } else {
+        // add 3 to get to (4,15)
+        layerId = 3 + trackerTopology_->pxfDisk(detId);
+      }
+    }
 
     // loop over RecHits
     for (auto const& hit : detSet) {

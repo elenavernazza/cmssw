@@ -55,19 +55,27 @@ namespace simdoublets {
 
   // function that determines the number of skipped layers for a given pair of layer IDs
   // layerIds cover the ranges:
-  // 1 to 4 (barrel), 101 to 112 (backward), 201 to 212 (forward)
+  // 0 to 3 (barrel), 4 to 15 (forward), 16 to 27 (backward)
   int getNumSkippedLayers(std::pair<uint8_t, uint8_t> const& layerIds) {
+    bool innerInBarrel = (layerIds.first < 4);
+    bool outerInBarrel = (layerIds.second < 4);
+    bool innerInBackward = (layerIds.first > 15);
+    bool outerInBackward = (layerIds.second > 15);
+    bool innerInForward = (!innerInBarrel) && (!innerInBackward);
+    bool outerInForward = (!outerInBarrel) && (!outerInBackward);
+
     // Possibility 0: invalid case (outer layer is not the outer one), set to -1
     if (layerIds.first >= layerIds.second) {
       return -1;
     }
     // Possibility 1: both RecHits lie in the same detector part (barrel, forward or backward)
-    else if ((layerIds.second - layerIds.first) < 50) {
+    else if ((innerInBarrel && outerInBarrel) || (innerInForward && outerInForward) ||
+             (innerInBackward && outerInBackward)) {
       return (layerIds.second - layerIds.first - 1);
     }
     // Possibility 2: the inner RecHit is in the barrel while the outer is in either forward or backward
-    else if (layerIds.first < 5) {
-      return (layerIds.second % 100) - 1;
+    else if (innerInBarrel) {
+      return (outerInForward) ? (layerIds.second - 4) : (layerIds.second - 16);
     }
     // Possibility 3: invalid case (one is forward and the other in backward), set to -1
     else {
@@ -75,12 +83,11 @@ namespace simdoublets {
     }
   }
 
-
   // function that, for a pair of two layers, gives a unique pair Id (innerLayerId * 100 + outerLayerId)
   int getLayerPairId(std::pair<uint8_t, uint8_t> const& layerIds) {
     // first, convert the 1 to 212 ranged layer Id into the reco range 0 to 27
-    uint8_t innerLayerId = convertLayerIdToRange0to27(layerIds.first);
-    uint8_t outerLayerId = convertLayerIdToRange0to27(layerIds.second);
+    uint8_t innerLayerId = layerIds.first;
+    uint8_t outerLayerId = layerIds.second;
 
     // calculate the unique layer pair Id as (innerLayerId * 100 + outerLayerId)
     int layerPairId = (innerLayerId * 100 + outerLayerId);
@@ -141,12 +148,14 @@ SimDoublets::Doublet::Doublet(SimDoublets const& simDoublets,
 
 GlobalPoint SimDoublets::Doublet::innerGlobalPos() const {
   // get the inner RecHit's global position
-  return simdoublets::getGlobalHitPosition(recHitRefs_.first, trackerGeometry_, beamSpotPosition_, useClusterLocalPosition_);
+  return simdoublets::getGlobalHitPosition(
+      recHitRefs_.first, trackerGeometry_, beamSpotPosition_, useClusterLocalPosition_);
 }
 
 GlobalPoint SimDoublets::Doublet::outerGlobalPos() const {
   // get the outer RecHit's global position
-  return simdoublets::getGlobalHitPosition(recHitRefs_.second, trackerGeometry_, beamSpotPosition_, useClusterLocalPosition_);
+  return simdoublets::getGlobalHitPosition(
+      recHitRefs_.second, trackerGeometry_, beamSpotPosition_, useClusterLocalPosition_);
 }
 
 // SimDoublets class member function
