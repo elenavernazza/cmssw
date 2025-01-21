@@ -31,7 +31,6 @@
 #include "SimDataFormats/TrackingAnalysis/interface/SimDoublets.h"
 
 #include <cstddef>
-#include <iostream>
 #include <utility>
 #include <vector>
 #include <memory>
@@ -69,6 +68,30 @@ private:
   const edm::EDGetTokenT<reco::BeamSpot> beamSpot_getToken_;
   const edm::EDPutTokenT<SimDoubletsCollection> simDoublets_putToken_;
 };
+
+
+namespace simdoublets {
+  // function that determines the layerId from the detId for Phase-2
+  unsigned int getLayerId(DetId const& detId, const TrackerTopology* trackerTopology) {
+    // set default to 999 (invalid)
+    unsigned int layerId {999};
+
+    if (detId.subdetId() == PixelSubdetector::PixelBarrel) {
+      // subtract 1 in the barrel to get from (1,4) to (0,3)
+      layerId = trackerTopology->pxbLayer(detId) - 1;
+    } else if (detId.subdetId() == PixelSubdetector::PixelEndcap) {
+      if (trackerTopology->pxfSide(detId) == 1) {
+        // add 15 in the backward endcap to get from (1,12) to (16,27)
+        layerId = 15 + trackerTopology->pxfDisk(detId);
+      } else {
+        // add 3 in the forward endcap to get from (1,12) to (4,15)
+        layerId = 3 + trackerTopology->pxfDisk(detId);
+      }
+    }
+    // return the determined Id
+    return layerId;
+  }
+}
 
 
 
@@ -202,21 +225,7 @@ void SimDoubletsProducer::produce(edm::Event& event, const edm::EventSetup& even
   int count = 0;
   for (const auto& detSet : *hits) {
     // determine layer Id
-    const DetId &detId = detSet.detId();
-    unsigned int layerId {999};
-
-    if (detId.subdetId() == PixelSubdetector::PixelBarrel) {
-      // subtract 1 to get to (0,3)
-      layerId = trackerTopology_->pxbLayer(detId) - 1;
-    } else if (detId.subdetId() == PixelSubdetector::PixelEndcap) {
-      if (trackerTopology_->pxfSide(detId) == 1) {
-        // add 15 to get to (16,27)
-        layerId = 15 + trackerTopology_->pxfDisk(detId);
-      } else {
-        // add 3 to get to (4,15)
-        layerId = 3 + trackerTopology_->pxfDisk(detId);
-      }
-    }
+    unsigned int layerId = simdoublets::getLayerId(detSet.detId(), trackerTopology_);
 
     // loop over RecHits
     for (auto const& hit : detSet) {

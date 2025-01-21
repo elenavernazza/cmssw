@@ -1,31 +1,11 @@
 #include "SimDataFormats/TrackingAnalysis/interface/SimDoublets.h"
 
 #include "DataFormats/GeometryVector/interface/GlobalVector.h"
-#include "Geometry/CommonTopologies/interface/SimplePixelTopology.h"
 #include "DataFormats/TrackerCommon/interface/TrackerTopology.h"
 #include "DataFormats/GeometryCommonDetAlgo/interface/MeasurementPoint.h"
 #include "Geometry/TrackerGeometryBuilder/interface/TrackerGeometry.h"
 
 namespace simdoublets {
-
-  // function that converts layerId from one convention (1 to 212) to another (0 to 27)
-  uint8_t convertLayerIdToRange0to27(uint8_t const layerIdRange1to212) {
-    // if layer is in barrel (1,4)
-    if (layerIdRange1to212 < 5) {
-      // subtract 1 to get to (0,3)
-      return (layerIdRange1to212 - 1);
-    }
-    // if layer is in backward direction (101,112)
-    else if (layerIdRange1to212 < 200) {
-      // subtract 85 to get to (16,27)
-      return (layerIdRange1to212 - 85);
-    }
-    // if layer is in backward direction (201,212)
-    else {
-      // subtract 197 to get to (4,15)
-      return (layerIdRange1to212 - 197);
-    }
-  }
 
   // function that gets the global position of a RecHit based on its Cluster position
   GlobalPoint getGlobalHitPosition(SiPixelRecHitRef const& recHit,
@@ -85,14 +65,8 @@ namespace simdoublets {
 
   // function that, for a pair of two layers, gives a unique pair Id (innerLayerId * 100 + outerLayerId)
   int getLayerPairId(std::pair<uint8_t, uint8_t> const& layerIds) {
-    // first, convert the 1 to 212 ranged layer Id into the reco range 0 to 27
-    uint8_t innerLayerId = layerIds.first;
-    uint8_t outerLayerId = layerIds.second;
-
     // calculate the unique layer pair Id as (innerLayerId * 100 + outerLayerId)
-    int layerPairId = (innerLayerId * 100 + outerLayerId);
-
-    return layerPairId;
+    return (layerIds.first * 100 + layerIds.second);
   }
 
 }  // end namespace simdoublets
@@ -212,7 +186,7 @@ std::vector<SimDoublets::Doublet> SimDoublets::getSimDoublets(const TrackerGeome
   for (size_t i = 0; i < layerIdVector_.size(); i++) {
     uint8_t innerLayerId = layerIdVector_[i];
     uint8_t outerLayerId{};
-    size_t outerLayerStart{};
+    size_t outerLayerStart{layerIdVector_.size()};
 
     // find the next layer Id + at which hit this layer starts
     for (size_t j = i + 1; j < layerIdVector_.size(); j++) {
