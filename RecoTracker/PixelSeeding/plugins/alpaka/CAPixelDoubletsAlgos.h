@@ -52,15 +52,21 @@ namespace ALPAKA_ACCELERATOR_NAMESPACE::caPixelDoublets {
               const bool idealConditions,
               const float z0Cut,
               const float ptCut,
-              const std::vector<int>& phiCutsV)
+              const std::vector<int>& phiCutsV,
+              const std::vector<int>& minzCutV,
+              const std::vector<int>& maxzCutV)
         : doClusterCut_(doClusterCut),
           doZ0Cut_(doZ0Cut),
           doPtCut_(doPtCut),
           idealConditions_(idealConditions),
           z0Cut_(z0Cut),
           ptCut_(ptCut) {
-      assert(phiCutsV.size() == TrackerTraits::nPairs);
+      assert(phiCutsV.size() == T::nPairs);
       std::copy(phiCutsV.begin(), phiCutsV.end(), &phiCuts[0]);
+      assert(minzCutV.size() == T::nPairs);
+      std::copy(minzCutV.begin(), minzCutV.end(), &minzCut_[0]);
+      assert(maxzCutV.size() == T::nPairs);
+      std::copy(maxzCutV.begin(), maxzCutV.end(), &maxzCut_[0]);
     }
 
     bool doClusterCut_;
@@ -72,6 +78,8 @@ namespace ALPAKA_ACCELERATOR_NAMESPACE::caPixelDoublets {
     float ptCut_;
 
     int phiCuts[T::nPairs];
+    int minzCut_[T::nPairs];
+    int maxzCut_[T::nPairs];
 
     template <typename TAcc>
     ALPAKA_FN_ACC ALPAKA_FN_INLINE bool __attribute__((always_inline)) zSizeCut(const TAcc& acc,
@@ -219,7 +227,7 @@ namespace ALPAKA_ACCELERATOR_NAMESPACE::caPixelDoublets {
 
       auto mez = hh[i].zGlobal();
 
-      if (mez < TrackerTraits::minz[pairLayerId] || mez > TrackerTraits::maxz[pairLayerId])
+      if (mez < cuts.minzCut_[pairLayerId] || mez > cuts.maxzCut_[pairLayerId])
         continue;
 
       if (doClusterCut && outer > pixelTopology::last_barrel_layer && cuts.clusterCut(acc, hh, i))
