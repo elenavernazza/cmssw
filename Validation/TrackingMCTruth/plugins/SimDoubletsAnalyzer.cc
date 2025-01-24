@@ -23,7 +23,9 @@
 // user include files
 #include "DataFormats/Histograms/interface/MonitorElementCollection.h"
 #include "DataFormats/Math/interface/deltaPhi.h"
+#include "DataFormats/Math/interface/approx_atan2.h"
 #include "SimDataFormats/TrackingAnalysis/interface/SimDoublets.h"
+#include "SimDataFormats/TrackingAnalysis/interface/TrackingParticle.h"
 #include "Geometry/CommonTopologies/interface/SimplePixelTopology.h"
 #include "Geometry/Records/interface/TrackerDigiGeometryRecord.h"
 #include "FWCore/Framework/interface/Frameworkfwd.h"
@@ -36,9 +38,9 @@
 
 #include "DQMServices/Core/interface/MonitorElement.h"
 
-//
+// -------------------------------------------------------------------------------------------------------------
 // class declaration
-//
+// -------------------------------------------------------------------------------------------------------------
 
 class SimDoubletsAnalyzer : public DQMEDAnalyzer {
 public:
@@ -59,12 +61,29 @@ private:
   const edm::ESGetToken<TrackerGeometry, TrackerDigiGeometryRecord> geometry_getToken_;
   const edm::EDGetTokenT<SimDoubletsCollection> simDoublets_getToken_;
 
+  // cutting parameters
+  std::vector<double> cellMinz_;
+  std::vector<double> cellMaxz_;
+  std::vector<int> cellPhiCuts_;
+  std::vector<double> cellMaxr_;
+  int cellMinYSizeB1_;
+  int cellMinYSizeB2_;
+  int cellMaxDYSize12_;
+  int cellMaxDYSize_;
+  int cellMaxDYPred_;
+  double cellZ0Cut_;
+  double cellPtCut_;
+
   std::string folder_;  // main folder in the DQM file
   int eventCount_ = 0;  // event counter
 
   // monitor elements (histograms) to be filled
   MonitorElement* h_layerPairs_;
   MonitorElement* h_numSkippedLayers_;
+  MonitorElement* h_numTotVsPt_;
+  MonitorElement* h_numPassVsPt_;
+  MonitorElement* h_numTotVsEta_;
+  MonitorElement* h_numPassVsEta_;
   MonitorElement* h_z0_;
   MonitorElement* h_curvatureR_;
   MonitorElement* h_pTFromR_;
@@ -75,6 +94,7 @@ private:
   MonitorElement* h_DYPred_;
   std::vector<MonitorElement*> hVector_dr_;
   std::vector<MonitorElement*> hVector_dphi_;
+  std::vector<MonitorElement*> hVector_idphi_;
   std::vector<MonitorElement*> hVector_innerZ_;
   std::vector<MonitorElement*> hVector_clusterSizeY_;
   std::vector<MonitorElement*> hVector_dsizeYonlyBarrel_;
@@ -104,6 +124,31 @@ namespace simdoublets {
 
     return {innerLayerName, outerLayerName};
   }
+
+  // make bins logarithmic
+  void BinLogX(TH1* h) {
+    TAxis* axis = h->GetXaxis();
+    int bins = axis->GetNbins();
+
+    float from = axis->GetXmin();
+    float to = axis->GetXmax();
+    float width = (to - from) / bins;
+    std::vector<float> new_bins(bins + 1, 0);
+
+    for (int i = 0; i <= bins; i++) {
+      new_bins[i] = TMath::Power(10, from + i * width);
+    }
+    axis->Set(bins, new_bins.data());
+  }
+
+  // function to produce histogram with log scale on x (taken from MultiTrackValidator)
+  template <typename... Args>
+  dqm::reco::MonitorElement* make1DLogX(dqm::reco::DQMStore::IBooker& ibook, Args&&... args) {
+    auto h = std::make_unique<TH1F>(std::forward<Args>(args)...);
+    BinLogX(h.get());
+    const auto& name = h->GetName();
+    return ibook.book1D(name, h.release());
+  }
 }  // namespace simdoublets
 
 //
@@ -114,13 +159,15 @@ namespace simdoublets {
 // NOTE: It is absolutely necessary that the map is sorted here,
 // otherwise the histograms will not be labeled corresponding to the correct layer pair but are mixed up
 static const std::map<int, int> layerPairId2Index{
-    {1, 0},     {2, 1},     {4, 2},     {5, 3},     {16, 4},    {17, 5},    {102, 6},   {103, 7},   {104, 8},
-    {105, 9},   {116, 10},  {117, 11},  {203, 12},  {204, 13},  {205, 14},  {216, 15},  {217, 16},  {405, 17},
-    {406, 18},  {506, 19},  {507, 20},  {607, 21},  {608, 22},  {708, 23},  {709, 24},  {809, 25},  {810, 26},
-    {910, 27},  {911, 28},  {1011, 29}, {1012, 30}, {1112, 31}, {1113, 32}, {1213, 33}, {1214, 34}, {1314, 35},
-    {1315, 36}, {1415, 37}, {1617, 38}, {1618, 39}, {1718, 40}, {1719, 41}, {1819, 42}, {1820, 43}, {1920, 44},
-    {1921, 45}, {2021, 46}, {2022, 47}, {2122, 48}, {2123, 49}, {2223, 50}, {2224, 51}, {2324, 52}, {2325, 53},
-    {2425, 54}, {2426, 55}, {2526, 56}, {2527, 57}, {2627, 58}};
+    {1, 0},     {4, 1},     {16, 2},    {102, 3},   {104, 4},   {116, 5},   {203, 6},   {204, 7},   {216, 8},
+    {405, 9},   {506, 10},  {607, 11},  {708, 12},  {809, 13},  {910, 14},  {1011, 15}, {1617, 16}, {1718, 17},
+    {1819, 18}, {1920, 19}, {2021, 20}, {2122, 21}, {2223, 22}, {2, 23},    {5, 24},    {17, 25},   {6, 26},
+    {18, 27},   {103, 28},  {105, 29},  {117, 30},  {106, 31},  {118, 32},  {1112, 33}, {1213, 34}, {1314, 35},
+    {1415, 36}, {2324, 37}, {2425, 38}, {2526, 39}, {2627, 40}, {406, 41},  {507, 42},  {608, 43},  {709, 44},
+    {810, 45},  {911, 46},  {1012, 47}, {1618, 48}, {1719, 49}, {1820, 50}, {1921, 51}, {2022, 52}, {2123, 53},
+    {2224, 54}, {1315, 55}, {217, 56},  {205, 57},  {2325, 58}, {1113, 59}, {2426, 60}, {1214, 61}, {2527, 62}};
+
+static const size_t numLayerPairs = layerPairId2Index.size();
 
 // -------------------------------
 // constructors and destructor
@@ -128,7 +175,26 @@ static const std::map<int, int> layerPairId2Index{
 SimDoubletsAnalyzer::SimDoubletsAnalyzer(const edm::ParameterSet& iConfig)
     : geometry_getToken_(esConsumes<TrackerGeometry, TrackerDigiGeometryRecord, edm::Transition::BeginRun>()),
       simDoublets_getToken_(consumes(iConfig.getParameter<edm::InputTag>("simDoubletsSrc"))),
-      folder_(iConfig.getParameter<std::string>("folder")) {}
+      cellMinz_(iConfig.getParameter<std::vector<double>>("cellMinz")),
+      cellMaxz_(iConfig.getParameter<std::vector<double>>("cellMaxz")),
+      cellPhiCuts_(iConfig.getParameter<std::vector<int>>("cellPhiCuts")),
+      cellMaxr_(iConfig.getParameter<std::vector<double>>("cellMaxr")),
+      cellMinYSizeB1_(iConfig.getParameter<int>("cellMinYSizeB1")),
+      cellMinYSizeB2_(iConfig.getParameter<int>("cellMinYSizeB2")),
+      cellMaxDYSize12_(iConfig.getParameter<int>("cellMaxDYSize12")),
+      cellMaxDYSize_(iConfig.getParameter<int>("cellMaxDYSize")),
+      cellMaxDYPred_(iConfig.getParameter<int>("cellMaxDYPred")),
+      cellZ0Cut_(iConfig.getParameter<double>("cellZ0Cut")),
+      cellPtCut_(iConfig.getParameter<double>("cellPtCut")),
+      folder_(iConfig.getParameter<std::string>("folder")) {
+  hVector_dr_.resize(numLayerPairs);
+  hVector_dphi_.resize(numLayerPairs);
+  hVector_idphi_.resize(numLayerPairs);
+  hVector_innerZ_.resize(numLayerPairs);
+  hVector_clusterSizeY_.resize(numLayerPairs);
+  hVector_dsizeYonlyBarrel_.resize(numLayerPairs);
+  hVector_dsizeYinnerBarrel_.resize(numLayerPairs);
+}
 
 SimDoubletsAnalyzer::~SimDoubletsAnalyzer() {}
 
@@ -150,6 +216,10 @@ void SimDoubletsAnalyzer::analyze(const edm::Event& iEvent, const edm::EventSetu
 
   // loop over SimDoublets (= loop over TrackingParticles)
   for (auto const& simDoublets : simDoubletsCollection) {
+    // get true pT of the TrackingParticle
+    auto true_pT = simDoublets.trackingParticle()->pt();
+    auto true_eta = simDoublets.trackingParticle()->eta();
+
     // create the true RecHit doublets of the TrackingParticle
     auto doublets = simDoublets.getSimDoublets(trackerGeometry_);
 
@@ -159,13 +229,16 @@ void SimDoubletsAnalyzer::analyze(const edm::Event& iEvent, const edm::EventSetu
       auto inner_r = doublet.innerGlobalPos().perp();
       auto inner_z = doublet.innerGlobalPos().z();
       auto inner_phi = doublet.innerGlobalPos().barePhi();  // returns float, whereas .phi() returns phi object
+      auto inner_iphi = unsafe_atan2s<7>(doublet.innerGlobalPos().y(), doublet.innerGlobalPos().x());
       auto outer_r = doublet.outerGlobalPos().perp();
       auto outer_z = doublet.outerGlobalPos().z();
       auto outer_phi = doublet.outerGlobalPos().barePhi();
+      auto outer_iphi = unsafe_atan2s<7>(doublet.outerGlobalPos().y(), doublet.outerGlobalPos().x());
 
       auto dz = outer_z - inner_z;
       auto dr = outer_r - inner_r;
       auto dphi = reco::deltaPhi(inner_phi, outer_phi);
+      auto idphi = std::min(std::abs(int16_t(outer_iphi - inner_iphi)), std::abs(int16_t(inner_iphi - outer_iphi)));
 
       // ----------------------------------------------------------
       // layer pair independent plots (main folder)
@@ -178,14 +251,16 @@ void SimDoubletsAnalyzer::analyze(const edm::Event& iEvent, const edm::EventSetu
       h_numSkippedLayers_->Fill(doublet.numSkippedLayers());
 
       // longitudinal impact parameter with respect to the beamspot
-      h_z0_->Fill(std::abs(inner_r * outer_z - inner_z * outer_r) / dr);
+      double z0 = std::abs(inner_r * outer_z - inner_z * outer_r) / dr;
+      h_z0_->Fill(z0);
 
       // radius of the circle defined by the two RecHits and the beamspot
       auto curvature = 1.f / 2.f * std::sqrt((dr / dphi) * (dr / dphi) + (inner_r * outer_r));
       h_curvatureR_->Fill(curvature);
 
       // pT that this curvature radius corresponds to
-      h_pTFromR_->Fill(curvature / 87.78f);
+      auto pT = curvature / 87.78f;
+      h_pTFromR_->Fill(pT);
 
       // ----------------------------------------------------------
       // layer pair dependent plots (sub-folders for layer pairs)
@@ -205,6 +280,7 @@ void SimDoubletsAnalyzer::analyze(const edm::Event& iEvent, const edm::EventSetu
 
       // dphi histogram
       hVector_dphi_[layerPairIdIndex]->Fill(dphi);
+      hVector_idphi_[layerPairIdIndex]->Fill(idphi);
 
       // z of the inner RecHit histogram
       hVector_innerZ_[layerPairIdIndex]->Fill(inner_z);
@@ -212,6 +288,26 @@ void SimDoubletsAnalyzer::analyze(const edm::Event& iEvent, const edm::EventSetu
       // cluster size in local y histogram
       auto innerClusterSizeY = doublet.innerRecHit()->cluster()->sizeY();
       hVector_clusterSizeY_[layerPairIdIndex]->Fill(innerClusterSizeY);
+
+      // create bool that indicates if the doublet gets cut
+      bool doubletGetsCut = false;
+      // apply all cuts that do not depend on the cluster size
+      // z window cut
+      if (inner_z < cellMinz_[layerPairIdIndex] || inner_z > cellMaxz_[layerPairIdIndex]) {
+        doubletGetsCut = true;
+      }
+      // z0cutoff
+      if (dr > cellMaxr_[layerPairIdIndex] || dr < 0 || z0 > cellZ0Cut_) {
+        doubletGetsCut = true;
+      }
+      // ptcut
+      if (pT < cellPtCut_) {
+        doubletGetsCut = true;
+      }
+      // iphicut
+      if (idphi > cellPhiCuts_[layerPairIdIndex]) {
+        doubletGetsCut = true;
+      }
 
       // determine the moduleId
       DetId detIdObject(doublet.innerRecHit()->geographicalId());
@@ -227,11 +323,21 @@ void SimDoubletsAnalyzer::analyze(const edm::Event& iEvent, const edm::EventSetu
 
       // histograms for clusterCut
       // cluster size in local y
-      if (innerInB1 && isOuterLadder) {
-        h_YsizeB1_->Fill(innerClusterSizeY);
-      }
-      if (innerInB2) {
-        h_YsizeB2_->Fill(innerClusterSizeY);
+      if (!outerInBarrel) {
+        if (innerInB1 && isOuterLadder) {
+          h_YsizeB1_->Fill(innerClusterSizeY);
+          // apply the cut
+          if (innerClusterSizeY < cellMinYSizeB1_) {
+            doubletGetsCut = true;
+          }
+        }
+        if (innerInB2) {
+          h_YsizeB2_->Fill(innerClusterSizeY);
+          // apply the cut
+          if (innerClusterSizeY < cellMinYSizeB2_) {
+            doubletGetsCut = true;
+          }
+        }
       }
 
       // histograms for zSizeCut
@@ -241,22 +347,52 @@ void SimDoubletsAnalyzer::analyze(const edm::Event& iEvent, const edm::EventSetu
           if (innerInB1 && isOuterLadder) {
             hVector_dsizeYonlyBarrel_[layerPairIdIndex]->Fill(DYsize);
             h_DYsize12_->Fill(DYsize);
+            // apply the cut
+            if (DYsize > cellMaxDYSize12_) {
+              doubletGetsCut = true;
+            }
           } else if (!innerInB1) {
             hVector_dsizeYonlyBarrel_[layerPairIdIndex]->Fill(DYsize);
             h_DYsize_->Fill(DYsize);
+            // apply the cut
+            if (DYsize > cellMaxDYSize_) {
+              doubletGetsCut = true;
+            }
           }
         } else {  // not onlyBarrel
           int DYsizePred =
               std::abs(innerClusterSizeY - int(std::abs(dz / dr) * pixelTopology::Phase2::dzdrFact + 0.5f));
           hVector_dsizeYinnerBarrel_[layerPairIdIndex]->Fill(DYsizePred);
           h_DYPred_->Fill(DYsizePred);
+          // apply the cut
+          if (DYsizePred > cellMaxDYPred_) {
+            doubletGetsCut = true;
+          }
         }
+      }
+
+      // fill the number histograms
+      // histogram of all valid doublets
+      h_numTotVsPt_->Fill(true_pT);
+      h_numTotVsEta_->Fill(true_eta);
+      // fill histogram of doublets that pass all cuts
+      if (!doubletGetsCut) {
+        h_numPassVsPt_->Fill(true_pT);
+        h_numPassVsEta_->Fill(true_eta);
       }
     }  // end loop over those doublets
   }  // end loop over SimDoublets (= loop over TrackingParticles)
 }
 
 void SimDoubletsAnalyzer::bookHistograms(DQMStore::IBooker& ibook, edm::Run const& run, edm::EventSetup const& iSetup) {
+  // set some common parameters
+  int pTNBins = 50;
+  double pTmin = log10(0.01);
+  double pTmax = log10(1000);
+  int etaNBins = 50;
+  double etamin = -4.;
+  double etamax = 4.;
+
   ibook.setCurrentFolder(folder_);
 
   // ----------------------------------------------------------
@@ -268,18 +404,46 @@ void SimDoubletsAnalyzer::bookHistograms(DQMStore::IBooker& ibook, edm::Run cons
       "layerPairs", "Layer pairs in SimDoublets; Inner layer ID; Outer layer ID", 28, -0.5, 27.5, 28, -0.5, 27.5);
   h_numSkippedLayers_ = ibook.book1D(
       "numSkippedLayers", "Number of skipped layers; Number of skipped layers; Number of SimDoublets", 16, -1.5, 14.5);
+  h_numTotVsPt_ = simdoublets::make1DLogX(
+      ibook,
+      "numTotVsPt",
+      "Total number of SimDoublets; True transverse momentum p_{T} [GeV]; Total number of valid SimDoublets",
+      pTNBins,
+      pTmin,
+      pTmax);
+  h_numPassVsPt_ = simdoublets::make1DLogX(ibook,
+                                           "numPassVsPt",
+                                           "Number of passing SimDoublets; True transverse momentum p_{T} [GeV]; "
+                                           "Number of valid SimDoublets passing all cuts",
+                                           pTNBins,
+                                           pTmin,
+                                           pTmax);
+  h_numTotVsEta_ =
+      ibook.book1D("numTotVsEta",
+                   "Total number of SimDoublets; True pseudorapidity #eta; Total number of valid SimDoublets",
+                   etaNBins,
+                   etamin,
+                   etamax);
+  h_numPassVsEta_ = ibook.book1D(
+      "numPassVsEta",
+      "Total number of SimDoublets; True pseudorapidity #eta; Number of valid SimDoublets passing all cuts",
+      etaNBins,
+      etamin,
+      etamax);
 
   // histogram for z0cutoff  (z0Cut)
-  h_z0_ = ibook.book1D("z0", "z_0; Longitudinal impact parameter z_0 [cm]; Number of SimDoublets", 51, -1, 50);
+  h_z0_ = ibook.book1D("z0", "z_{0}; Longitudinal impact parameter z_{0} [cm]; Number of SimDoublets", 51, -1, 50);
 
   // histograms for ptcut  (ptCut)
   h_curvatureR_ = ibook.book1D(
       "curvatureR", "Curvature from SimDoublet+beamspot; Curvature radius [cm] ; Number of SimDoublets", 100, 0, 1000);
-  h_pTFromR_ = ibook.book1D("pTFromR",
-                            "Transverse momentum from curvature; Transverse momentum p_T [GeV]; Number of SimDoublets",
-                            500,
-                            0,
-                            1000);
+  h_pTFromR_ = simdoublets::make1DLogX(
+      ibook,
+      "pTFromR",
+      "Transverse momentum from curvature; Transverse momentum p_{T} [GeV]; Number of SimDoublets",
+      pTNBins,
+      pTmin,
+      pTmax);
 
   // histograms for clusterCut  (minYsizeB1 and minYsizeB2)
   h_YsizeB1_ =
@@ -313,6 +477,9 @@ void SimDoubletsAnalyzer::bookHistograms(DQMStore::IBooker& ibook, edm::Run cons
 
   // loop through valid layer pairs and add for each one booked hist per vector
   for (auto id = layerPairId2Index.begin(); id != layerPairId2Index.end(); ++id) {
+    // get the position of the layer pair in the histogram vectors
+    int layerPairIdIndex = id->second;
+
     // get layer names from the layer pair Id
     auto layerNames = simdoublets::getInnerOuterLayerNames(id->first);
     std::string innerLayerName = layerNames.first;
@@ -328,46 +495,53 @@ void SimDoubletsAnalyzer::bookHistograms(DQMStore::IBooker& ibook, edm::Run cons
     ibook.setCurrentFolder(folder_ + subFolderName);
 
     // histogram for z0cutoff  (maxr)
-    hVector_dr_.emplace_back(ibook.book1D(
+    hVector_dr_.at(layerPairIdIndex) = ibook.book1D(
         "dr",
         "dr of RecHit pair " + layerTitle + "; dr between outer and inner RecHit [cm]; Number of SimDoublets",
         31,
         -1,
-        30));
+        30);
 
-    // histogram for iphicut  (phiCuts)
-    hVector_dphi_.emplace_back(ibook.book1D(
+    // histograms for iphicut  (phiCuts)
+    hVector_dphi_.at(layerPairIdIndex) = ibook.book1D(
         "dphi",
         "dphi of RecHit pair " + layerTitle + "; d#phi between outer and inner RecHit [rad]; Number of SimDoublets",
         50,
         -M_PI,
-        M_PI));
+        M_PI);
+    hVector_idphi_.at(layerPairIdIndex) =
+        ibook.book1D("idphi",
+                     "idphi of RecHit pair " + layerTitle +
+                         "; Absolute int d#phi between outer and inner RecHit [rad]; Number of SimDoublets",
+                     50,
+                     0,
+                     1000);
 
     // histogram for z window  (minz and maxz)
-    hVector_innerZ_.emplace_back(
+    hVector_innerZ_.at(layerPairIdIndex) =
         ibook.book1D("innerZ",
                      "z of the inner RecHit " + layerTitle + "; z of inner RecHit [cm]; Number of SimDoublets",
                      100,
                      -300,
-                     300));
+                     300);
 
     // other histograms
-    hVector_dsizeYonlyBarrel_.emplace_back(ibook.book1D("dsizeYonlyBarrel",
-                                                        "Cluster Size Y Difference between outer and inner RecHit " +
-                                                            layerTitle +
-                                                            "; Cluster Size Y Difference ; Number of SimDoublets",
-                                                        51,
-                                                        -1,
-                                                        50));
-    hVector_dsizeYinnerBarrel_.emplace_back(
+    hVector_dsizeYonlyBarrel_.at(layerPairIdIndex) =
+        ibook.book1D("dsizeYonlyBarrel",
+                     "Cluster Size Y Difference between outer and inner RecHit " + layerTitle +
+                         "; Cluster Size Y Difference ; Number of SimDoublets",
+                     51,
+                     -1,
+                     50);
+    hVector_dsizeYinnerBarrel_.at(layerPairIdIndex) =
         ibook.book1D("dsizeYinnerBarrel",
                      "Projected Cluster Size Y Difference between outer and inner RecHit " + layerTitle +
                          "; Cluster Size Y Difference ; Number of SimDoublets",
                      51,
                      -1,
-                     50));
-    hVector_clusterSizeY_.emplace_back(
-        ibook.book1D("sizeY", "Cluster Size Y " + layerTitle + "; Cluster Size Y ; Number of SimDoublets", 51, -1, 50));
+                     50);
+    hVector_clusterSizeY_.at(layerPairIdIndex) =
+        ibook.book1D("sizeY", "Cluster Size Y " + layerTitle + "; Cluster Size Y ; Number of SimDoublets", 51, -1, 50);
   }
 }
 
@@ -375,6 +549,20 @@ void SimDoubletsAnalyzer::fillDescriptions(edm::ConfigurationDescriptions& descr
   edm::ParameterSetDescription desc;
   desc.add<std::string>("folder", "Tracking/TrackingMCTruth/SimDoublets");
   desc.add<edm::InputTag>("simDoubletsSrc", edm::InputTag("simDoubletsProducer"));
+
+  // cutting parameters
+  desc.add<std::vector<double>>("cellMinz", std::vector<double>(55, -20.))->setComment("Minimum z for each layer pair");
+  desc.add<std::vector<double>>("cellMaxz", std::vector<double>(55, 20.))->setComment("Maximum z for each layer pair");
+  desc.add<std::vector<int>>("cellPhiCuts", std::vector<int>(55, 20))->setComment("Cuts in phi for cells");
+  desc.add<std::vector<double>>("cellMaxr", std::vector<double>(55, 20.))->setComment("Cut for dr of cells");
+  desc.add<int>("cellMinYSizeB1", 25)->setComment("Minimum cluster size for B1");
+  desc.add<int>("cellMinYSizeB2", 15)->setComment("Minimum cluster size for B2");
+  desc.add<int>("cellMaxDYSize12", 12)->setComment("Maximum cluster size difference for B1/B2");
+  desc.add<int>("cellMaxDYSize", 10)->setComment("Maximum cluster size difference");
+  desc.add<int>("cellMaxDYPred", 20)->setComment("Maximum cluster size difference prediction");
+  desc.add<double>("cellZ0Cut", 7.5)->setComment("Maximum longitudinal impact parameter");
+  desc.add<double>("cellPtCut", 0.85)->setComment("Minimum tranverse momentum");
+
   descriptions.addWithDefaultLabel(desc);
 }
 
