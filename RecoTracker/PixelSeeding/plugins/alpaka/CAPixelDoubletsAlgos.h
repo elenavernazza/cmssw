@@ -58,8 +58,9 @@ namespace ALPAKA_ACCELERATOR_NAMESPACE::caPixelDoublets {
               const int maxDYSize,
               const int maxDYPred,
               const std::vector<int>& phiCutsV,
-              const std::vector<int>& minzCutV,
-              const std::vector<int>& maxzCutV)
+              const std::vector<double>& minzCutV,
+              const std::vector<double>& maxzCutV,
+              const std::vector<double>& cellMaxrCutV)
         : doClusterCut_(doClusterCut),
           doZ0Cut_(doZ0Cut),
           doPtCut_(doPtCut),
@@ -72,11 +73,13 @@ namespace ALPAKA_ACCELERATOR_NAMESPACE::caPixelDoublets {
           maxDYSize_(maxDYSize),
           maxDYPred_(maxDYPred) {
       assert(phiCutsV.size() == T::nPairs);
-      std::copy(phiCutsV.begin(), phiCutsV.end(), &phiCuts[0]);
+      std::copy(phiCutsV.begin(), phiCutsV.end(), &phiCuts_[0]);
       assert(minzCutV.size() == T::nPairs);
       std::copy(minzCutV.begin(), minzCutV.end(), &minzCut_[0]);
       assert(maxzCutV.size() == T::nPairs);
       std::copy(maxzCutV.begin(), maxzCutV.end(), &maxzCut_[0]);
+      assert(cellMaxrCutV.size() == T::nPairs);
+      std::copy(cellMaxrCutV.begin(), cellMaxrCutV.end(), &cellMaxrCut_[0]);
     }
 
     const bool doClusterCut_;
@@ -94,9 +97,10 @@ namespace ALPAKA_ACCELERATOR_NAMESPACE::caPixelDoublets {
     const int maxDYSize_;
     const int maxDYPred_;
 
-    int phiCuts[T::nPairs];
-    int minzCut_[T::nPairs];
-    int maxzCut_[T::nPairs];
+    int phiCuts_[T::nPairs];
+    double minzCut_[T::nPairs];
+    double maxzCut_[T::nPairs];
+    double cellMaxrCut_[T::nPairs];
 
     template <typename TAcc>
     ALPAKA_FN_ACC ALPAKA_FN_INLINE bool __attribute__((always_inline)) zSizeCut(const TAcc& acc,
@@ -265,10 +269,10 @@ namespace ALPAKA_ACCELERATOR_NAMESPACE::caPixelDoublets {
         auto zo = hh[j].zGlobal();
         auto ro = hh[j].rGlobal();
         auto dr = ro - mer;
-        return dr > TrackerTraits::maxr[pairLayerId] || dr < 0 || std::abs((mez * ro - mer * zo)) > z0cut * dr;
+        return dr > cuts.cellMaxrCut_[pairLayerId] || dr < 0 || std::abs((mez * ro - mer * zo)) > z0cut * dr;
       };
 
-      auto iphicut = cuts.phiCuts[pairLayerId];
+      auto iphicut = cuts.phiCuts_[pairLayerId];
 
       auto kl = PhiBinner::bin(int16_t(mep - iphicut));
       auto kh = PhiBinner::bin(int16_t(mep + iphicut));
@@ -343,8 +347,8 @@ namespace ALPAKA_ACCELERATOR_NAMESPACE::caPixelDoublets {
                tot,
                tooMany,
                iphicut,
-               TrackerTraits::minz[pairLayerId],
-               TrackerTraits::maxz[pairLayerId],
+               cell.minzCut_[pairLayerId],
+               cell.maxzCut_[pairLayerId],
                tooMany > 0 ? "FULL!!" : "not full.");
 #endif
     }  // loop in block...

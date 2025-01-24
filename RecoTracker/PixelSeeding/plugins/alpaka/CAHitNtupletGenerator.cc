@@ -61,8 +61,9 @@ namespace ALPAKA_ACCELERATOR_NAMESPACE {
       desc.add<bool>("doSharedHitCut", true)->setComment("Sharing hit nTuples cleaning");
       desc.add<bool>("dupPassThrough", false)->setComment("Do not reject duplicate");
       desc.add<bool>("useSimpleTripletCleaner", true)->setComment("use alternate implementation");
-      desc.add<std::vector<int>>("cellMinz", std::vector<int>(55, -20))->setComment("Minimum z for each layer pair");
-      desc.add<std::vector<int>>("cellMaxz", std::vector<int>(55, 20))->setComment("Maximum z for each layer pair");
+      desc.add<std::vector<double>>("cellMinz", std::vector<double>(55, -20.))->setComment("Minimum z for each layer pair");
+      desc.add<std::vector<double>>("cellMaxz", std::vector<double>(55, 20.))->setComment("Maximum z for each layer pair");
+      desc.add<std::vector<double>>("cellMaxr", std::vector<double>(55, 0.))->setComment("Maximum r for each layer pair");
       desc.add<int>("cellMinYSizeB1", 25)->setComment("Minimum cluster size for B1");
       desc.add<int>("cellMinYSizeB2", 15)->setComment("Minimum cluster size for B2");
       desc.add<int>("cellMaxDYSize12", 12)->setComment("Maximum cluster size difference for B1/B2");
@@ -163,8 +164,9 @@ namespace ALPAKA_ACCELERATOR_NAMESPACE {
                                       cfg.getParameter<int>("cellMaxDYSize"),
                                       cfg.getParameter<int>("cellMaxDYPred"),
                                       cfg.getParameter<std::vector<int>>("phiCuts"),
-                                      cfg.getParameter<std::vector<int>>("cellMinz"),
-                                      cfg.getParameter<std::vector<int>>("cellMaxz")};
+                                      cfg.getParameter<std::vector<double>>("cellMinz"),
+                                      cfg.getParameter<std::vector<double>>("cellMaxz"),
+                                      cfg.getParameter<std::vector<double>>("cellMaxr")};
     }
 
   }  // namespace
