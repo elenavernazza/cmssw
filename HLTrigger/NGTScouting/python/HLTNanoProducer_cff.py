@@ -4,10 +4,10 @@ from PhysicsTools.NanoAOD.common_cff import *
 
 from PhysicsTools.NanoAOD.genparticles_cff import *
 from PhysicsTools.PatAlgos.slimming.prunedGenParticles_cfi import *
-from HLTrigger.NGTScouting.HLTVertices_cff import *
+from HLTrigger.NGTScouting.hltVertices_cfi import *
 
 hltNanoProducer = cms.Sequence(
-    hltVertexTablesProducer
+    hltVertexTable
 )
 
 def hltNanoCustomize(process):

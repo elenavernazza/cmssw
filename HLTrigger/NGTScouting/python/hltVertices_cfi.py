@@ -1,9 +1,6 @@
 import FWCore.ParameterSet.Config as cms
 from PhysicsTools.NanoAOD.common_cff import *
 
-##################### User floats producers, selectors ##########################
-
-
 ##################### Tables for final output and docs ##########################
 hltVertexTable = cms.EDProducer(
     "HLTVertexTableProducer",
@@ -12,9 +9,5 @@ hltVertexTable = cms.EDProducer(
     pfSrc = cms.InputTag("hltParticleFlowTmp"),
     dlenMin = cms.double(0),
     dlenSigMin = cms.double(3),
-    pvName = cms.string("PV"),
-)
-
-hltVertexTablesProducer = cms.Sequence(
-    hltVertexTable
+    pvName = cms.string("hltPrimaryVertex"),
 )
