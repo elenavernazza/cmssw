@@ -2,7 +2,7 @@
 # using: 
 # Revision: 1.19 
 # Source: /local/reps/CMSSW/CMSSW/Configuration/Applications/python/ConfigBuilder.py,v 
-# with command line options: step2 -s DIGI:pdigi_valid,L1TrackTrigger,L1,L1P2GT,DIGI2RAW,HLT:NGTScouting,NANO:@HLT --conditions auto:phase2_realistic_T33 --datatier GEN-SIM-DIGI-RAW,NANOAODSIM --eventcontent FEVTDEBUGHLT,NANOAODSIM --geometry ExtendedRun4D110 --era Phase2C17I13M9 --filein file:step1.root --fileout file:step2.root -n 10
+# with command line options: step2 -s DIGI:pdigi_valid,L1TrackTrigger,L1,L1P2GT,DIGI2RAW,HLT:NGTScouting,NANO:@HLT --conditions auto:phase2_realistic_T33 --datatier GEN-SIM-DIGI-RAW,NANOAODSIM --eventcontent FEVTDEBUGHLT,NANOAODSIM --geometry ExtendedRun4D110 --era Phase2C17I13M9 --filein file:/eos/user/e/evernazz/www/NGT/NanoAOD/step1.root --fileout file:step2.root -n 10 --python step2_DIGI_L1TrackTrigger_L1_L1P2GT_DIGI2RAW_HLT_Scouting_NANO_New.py --no_exec
 import FWCore.ParameterSet.Config as cms
 
 from Configuration.Eras.Era_Phase2C17I13M9_cff import Phase2C17I13M9
@@ -104,7 +104,7 @@ process.FEVTDEBUGHLToutput = cms.OutputModule("PoolOutputModule",
         dataTier = cms.untracked.string('GEN-SIM-DIGI-RAW'),
         filterName = cms.untracked.string('')
     ),
-    fileName = cms.untracked.string('file:step2_ngt.root'),
+    fileName = cms.untracked.string('file:step2_scouting.root'),
     outputCommands = process.FEVTDEBUGHLTEventContent.outputCommands,
     splitLevel = cms.untracked.int32(0)
 )
@@ -116,7 +116,7 @@ process.NANOAODSIMoutput = cms.OutputModule("NanoAODOutputModule",
         dataTier = cms.untracked.string('NANOAODSIM'),
         filterName = cms.untracked.string('')
     ),
-    fileName = cms.untracked.string('file:step2_ngt_inNANOAODSIM.root'),
+    fileName = cms.untracked.string('file:step2_scouting_inNANOAODSIM.root'),
     outputCommands = process.NANOAODSIMEventContent.outputCommands
 )
 
