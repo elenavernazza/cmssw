@@ -13,6 +13,8 @@ hep.style.use("CMS")
 import warnings
 warnings.filterwarnings("ignore", message="The value of the smallest subnormal")
 
+# plt.rcParams['axes.formatter.limits'] = (-4, 4)
+
 class dotdict(dict):
     """dot.notation access to dictionary attributes"""
     __getattr__ = dict.get
@@ -296,6 +298,7 @@ if __name__ == '__main__':
 
     colors = hep.style.CMS['axes.prop_cycle'].by_key()['color']
     markers = ('o', 's', 'd')
+    err_kwargs = dict(capsize=3, elinewidth=0.8, capthick=0.8)
 
     #####################################
     # Plot 1D single variables
@@ -318,7 +321,7 @@ if __name__ == '__main__':
         nbins, bin_edges, bin_centers, bin_widths = define_bins(root_hist)
         values, errors = histo_values_errors(root_hist)
 
-        plt.errorbar(bin_centers, values, xerr=0.5 * bin_widths, yerr=errors, linestyle='', fmt='s', color='black', linewidth=2, label=Label)
+        plt.errorbar(bin_centers, values, xerr=0.5 * bin_widths, yerr=errors, linestyle='', fmt='s', color='black', linewidth=2, label=Label, **err_kwargs)
         plt.step(bin_edges[:-1], values, where="post", color='black')
         plotter.ax.text(0.03, 0.97, f"{JetType}", transform=plotter.ax.transAxes, fontsize=fontsize,
                         verticalalignment='top', horizontalalignment='left')
@@ -456,7 +459,7 @@ if __name__ == '__main__':
             nbins, bin_edges, bin_centers, bin_widths = define_bins(root_hist)
             values, errors = histo_values_errors(root_hist)
 
-            plt.errorbar(bin_centers, values, xerr=0.5 * bin_widths, yerr=errors, linestyle='', label=Label, color=colors[i_var], fmt=markers[i_var])
+            plt.errorbar(bin_centers, values, xerr=0.5 * bin_widths, yerr=errors, linestyle='', label=Label, color=colors[i_var], fmt=markers[i_var], **err_kwargs)
             plt.step(bin_edges[:-1], values, where="post", color=colors[i_var], linewidth=2)
 
         plotter.labels(x=GroupedVarList[GroupedVar].xlabel, y='# Jets' if 'Multiplicity' in GroupedVar else '# Jets', legend_title='')
@@ -481,57 +484,44 @@ if __name__ == '__main__':
             v_stacked_histo = []
             v_labels = []
             for i, (pt_label, hist_names) in enumerate(MergedPtBins.items()):
-                axis = None
-                stacked = None
+                stacked_hist = None
 
                 for j, hist_name in enumerate(hist_names):
-                    if EtaRegion == 'F': 
-                        root_hist = CheckRootFile(f"{dqm_dir}/{hist_name}", rebin=2)
+                    rebin = 2 if EtaRegion != 'F' else 4
+                    root_hist = CheckRootFile(f"{dqm_dir}/{hist_name}", rebin=rebin)
+                        
+                    if stacked_hist is None:
+                        stacked_hist = root_hist.Clone()
                     else:
-                        root_hist = CheckRootFile(f"{dqm_dir}/{hist_name}", rebin=None)
+                        stacked_hist.Add(root_hist)
 
-                    nbins = root_hist.GetNbinsX()
-                    edges = [root_hist.GetBinLowEdge(i+1) for i in range(nbins)]
-                    edges.append(root_hist.GetBinLowEdge(nbins+1))
-                    values = np.array([root_hist.GetBinContent(i+1) for i in range(nbins)])
-                    errors = np.array([root_hist.GetBinError(i+1) for i in range(nbins)])
-                    label = root_hist.GetXaxis().GetTitle()
-
-                    if axis is None:
-                        axis = hist.axis.Variable(edges, name=root_hist.GetTitle(), label=label)
-
-                    h = hist.Hist(axis, storage=hist.storage.Weight())
-                    h.view().value[:] = values
-                    h.view().variance[:] = errors**2
-
-                    if stacked is None:
-                        stacked = h
-                    else:
-                        stacked += h
-
-                if stacked == None: continue
-
-                v_stacked_histo.append(stacked)
+                if stacked_hist is None: continue
+                v_stacked_histo.append(stacked_hist)
                 v_labels.append(pt_label)
 
             if len(v_stacked_histo) == 0: continue
 
             plotter = Plotter(args.sample_label)
-
             for i, (stacked_histo, pt_label) in enumerate(zip(v_stacked_histo, v_labels)):
-                if stacked_histo.sum().value == 0:
+                if stacked_histo.Integral() == 0:
                     print(f"WARNING: Skipping empty histogram for {pt_label}")
                     continue
-                if stacked_histo.sum().value < 2:
+                if stacked_histo.Integral() < 2:
                     print(f"WARNING: Skipping histogram with low stat {pt_label}")
                     continue
-                stacked_histo.plot(ax=plotter.ax, density=True, color=colors[i], histtype="fill", alpha=0.1)
-                stacked_histo.plot(ax=plotter.ax, linewidth=2, label=pt_label, density=True, color=colors[i])
+
+                stacked_histo.Scale(1.0 / stacked_histo.Integral())
+                nbins, bin_edges, bin_centers, bin_widths = define_bins(stacked_histo)
+                values, errors = histo_values_errors(stacked_histo)
+
+                plotter.ax.hist(bin_edges[:-1], bins=bin_edges, weights=values, histtype='stepfilled', color=colors[i], alpha=0.1)
+                plotter.ax.hist(bin_edges[:-1], bins=bin_edges, weights=values, histtype='step', color=colors[i], linewidth=1.5)
+                plotter.ax.errorbar(bin_centers, values, xerr=0.5 * bin_widths, yerr=errors, fmt='o', markersize=3, color=colors[i], label=pt_label, **err_kwargs)
                 
             plotter.ax.text(0.03, 0.97, f"{JetType}\n{EtaInfo.label(EtaRegion)}", transform=plotter.ax.transAxes, fontsize=fontsize,
                             verticalalignment='top', horizontalalignment='left')
 
-            plotter.labels(x="${}$".format(v_stacked_histo[0].axes[0].label),
+            plotter.labels(x="${}$".format(v_stacked_histo[0].GetXaxis().GetTitle()),
                            y="[a.u.]",
                            legend_title=r"Jet $p_T$ range")
 
@@ -567,7 +557,7 @@ if __name__ == '__main__':
                     ylabel = myResolLabel.ytitle(resol=True) 
 
                 plotter.ax.errorbar(bin_centers, y, xerr=0.5 * bin_widths, yerr=y_errors, linestyle='',
-                                    fmt='o', color=ResolOptions[key][2], label=f'{key} {resol_type}')
+                                    fmt='o', color=ResolOptions[key][2], label=f'{key} {resol_type}', **err_kwargs)
 
                 if 'Pt' not in myXvar:
                     xlabel = fr'$\{myXvar.lower()}$'
@@ -602,7 +592,7 @@ if __name__ == '__main__':
                     ylabel = myResolLabel.ytitle(resol=True)
                 
                 plt.errorbar(bin_centers, y, xerr=0.5 * bin_widths, yerr=y_errors, linestyle='',
-                            fmt=EtaInfo.marker(etareg), color=EtaInfo.color(etareg), label=EtaInfo.label(etareg))
+                            fmt=EtaInfo.marker(etareg), color=EtaInfo.color(etareg), label=EtaInfo.label(etareg), **err_kwargs)
                 plt.step(bin_edges[:-1], y, where="post", color=EtaInfo.color(etareg))
 
             xlabel = HLabels.pt_label('gen') if 'Gen' in resol_type else HLabels.pt_label('reco')
@@ -668,7 +658,7 @@ if __name__ == '__main__':
         legend_eta = plotter.ax.legend(handles=eta_legend_elements, loc='upper right', fontsize=fontsize)
         legend_res = plotter.ax.legend(handles=res_legend_elements, loc='upper right', fontsize=fontsize, bbox_to_anchor=(0.73, 0.99))
         plotter.ax.add_artist(legend_eta)
-        plotter.save( os.path.join(args.odir, f'Pt{key}_CorrVsReco_New') )
+        plotter.save( os.path.join(args.odir, f'Pt{key}_CorrVsReco') )
 
     ########################################
     # Jet efficiency, fakes and duplicates
