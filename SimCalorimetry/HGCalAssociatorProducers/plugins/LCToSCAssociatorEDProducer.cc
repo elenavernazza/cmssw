@@ -59,8 +59,21 @@ void LCToSCAssociatorEDProducer::produce(edm::StreamID, edm::Event &iEvent, cons
   edm::Handle<ticl::LayerClusterToSimClusterAssociator> theAssociator;
   iEvent.getByToken(associatorToken_, theAssociator);
 
+  if (!theAssociator.isValid()) {
+    edm::LogWarning("LCToSCAssociatorEDProducer")
+        << "Associator is unavailable.";
+    return;
+  }
+
   Handle<SimClusterCollection> SCCollection;
   iEvent.getByToken(SCCollectionToken_, SCCollection);
+
+  if (!SCCollection.isValid()) {
+    edm::LogWarning("LCToSCAssociatorEDProducer")
+        << "SimCluster collection is unavailable. Producing empty associations.";
+
+    return;
+  }
 
   Handle<reco::CaloClusterCollection> LCCollection;
   iEvent.getByToken(LCCollectionToken_, LCCollection);

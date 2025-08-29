@@ -40,7 +40,7 @@ void LCToSCAssociatorByEnergyScoreProducer<HIT>::produce(edm::StreamID,
       // Check handle validity
       if (!hits_handle.isValid()) {
         edm::LogWarning("LCToSCAssociatorByEnergyScoreProducer")
-            << "Hit collection not available for token. Skipping this collection.";
+            << "HGCAL Hit collection not available for token. Skipping this collection.";
         continue;  // Skip invalid handle
       }
 
@@ -56,7 +56,7 @@ void LCToSCAssociatorByEnergyScoreProducer<HIT>::produce(edm::StreamID,
       // Check handle validity
       if (!hits_handle.isValid()) {
         edm::LogWarning("LCToSCAssociatorByEnergyScoreProducer")
-            << "Hit collection not available for token. Skipping this collection.";
+            << "Barrel Hit collection not available for token. Skipping this collection.";
         continue;  // Skip invalid handle
       }
 
@@ -65,6 +65,14 @@ void LCToSCAssociatorByEnergyScoreProducer<HIT>::produce(edm::StreamID,
       }
     }
   }
+
+  if (hits.empty()) {
+    edm::LogWarning("LCToSCAssociatorByEnergyScoreProducer") << "No hits collected. Producing empty associator.";
+    auto emptyAssociator = std::make_unique<ticl::LayerClusterToSimClusterAssociator>();
+    iEvent.put(std::move(emptyAssociator));
+    return;
+  }
+
   const auto hitMap = &iEvent.get(hitMap_);
 
   auto impl = std::make_unique<LCToSCAssociatorByEnergyScoreImpl<HIT>>(

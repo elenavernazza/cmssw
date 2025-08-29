@@ -67,24 +67,21 @@ void RecHitMapProducer::produce(edm::StreamID, edm::Event& evt, const edm::Event
   const auto& bh_hits = evt.getHandle(hgcal_hits_token_[2]);
 
   // Check validity of all handles
-  if (!ee_hits.isValid() || !fh_hits.isValid() || !bh_hits.isValid()) {
+  if ((ee_hits.isValid()) && (fh_hits.isValid()) && (bh_hits.isValid())) {
+    // TODO may be worth to avoid dependency on the order
+    // of the collections, maybe using a map
+    MultiVectorManager<HGCRecHit> rechitManager;
+    rechitManager.addVector(*ee_hits);
+    rechitManager.addVector(*fh_hits);
+    rechitManager.addVector(*bh_hits);
+
+    for (unsigned int i = 0; i < rechitManager.size(); ++i) {
+      const auto recHitDetId = rechitManager[i].detid();
+      hitMapHGCal->emplace(recHitDetId, i);
+    }
+  } else {
     edm::LogWarning("HGCalRecHitMapProducer") << "One or more hit collections are unavailable. Returning an empty map.";
-    evt.put(std::move(hitMapHGCal), "hgcalRecHitMap");
-    return;
   }
-
-  // TODO may be worth to avoid dependency on the order
-  // of the collections, maybe using a map
-  MultiVectorManager<HGCRecHit> rechitManager;
-  rechitManager.addVector(*ee_hits);
-  rechitManager.addVector(*fh_hits);
-  rechitManager.addVector(*bh_hits);
-
-  for (unsigned int i = 0; i < rechitManager.size(); ++i) {
-    const auto recHitDetId = rechitManager[i].detid();
-    hitMapHGCal->emplace(recHitDetId, i);
-  }
-
   evt.put(std::move(hitMapHGCal), "hgcalRecHitMap");
 
   if (!hgcalOnly_) {
