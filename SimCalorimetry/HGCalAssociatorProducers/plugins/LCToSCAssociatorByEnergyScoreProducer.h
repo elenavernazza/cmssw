@@ -20,7 +20,7 @@
 
 #include "DataFormats/HGCRecHit/interface/HGCRecHitCollections.h"
 
-template <typename HIT>
+template <typename HIT, typename CLUSTER>
 class LCToSCAssociatorByEnergyScoreProducer : public edm::global::EDProducer<> {
 public:
   explicit LCToSCAssociatorByEnergyScoreProducer(const edm::ParameterSet &);
@@ -39,12 +39,12 @@ private:
   std::vector<edm::EDGetTokenT<std::vector<HIT>>> hits_token_;
 };
 
-template class LCToSCAssociatorByEnergyScoreProducer<HGCRecHit>;
-template class LCToSCAssociatorByEnergyScoreProducer<reco::PFRecHit>;
+template class LCToSCAssociatorByEnergyScoreProducer<HGCRecHit, reco::CaloClusterCollection>;
+template class LCToSCAssociatorByEnergyScoreProducer<reco::PFRecHit, reco::CaloClusterCollection>;
 
-using HGCalLCToSCAssociatorByEnergyScoreProducer = LCToSCAssociatorByEnergyScoreProducer<HGCRecHit>;
+using HGCalLCToSCAssociatorByEnergyScoreProducer = LCToSCAssociatorByEnergyScoreProducer<HGCRecHit, reco::CaloClusterCollection>;
 DEFINE_FWK_MODULE(HGCalLCToSCAssociatorByEnergyScoreProducer);
-using BarrelLCToSCAssociatorByEnergyScoreProducer = LCToSCAssociatorByEnergyScoreProducer<reco::PFRecHit>;
+using BarrelLCToSCAssociatorByEnergyScoreProducer = LCToSCAssociatorByEnergyScoreProducer<reco::PFRecHit, reco::CaloClusterCollection>;
 DEFINE_FWK_MODULE(BarrelLCToSCAssociatorByEnergyScoreProducer);
 
 #endif

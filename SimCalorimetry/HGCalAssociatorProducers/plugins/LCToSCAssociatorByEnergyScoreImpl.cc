@@ -4,8 +4,8 @@
 #include "SimDataFormats/CaloAnalysis/interface/SimCluster.h"
 #include "DataFormats/CaloRecHit/interface/CaloCluster.h"
 
-template <typename HIT>
-LCToSCAssociatorByEnergyScoreImpl<HIT>::LCToSCAssociatorByEnergyScoreImpl(
+template <typename HIT, typename CLUSTER>
+LCToSCAssociatorByEnergyScoreImpl<HIT, CLUSTER>::LCToSCAssociatorByEnergyScoreImpl(
     edm::EDProductGetter const& productGetter,
     bool hardScatterOnly,
     std::shared_ptr<hgcal::RecHitTools> recHitTools,
@@ -22,8 +22,8 @@ LCToSCAssociatorByEnergyScoreImpl<HIT>::LCToSCAssociatorByEnergyScoreImpl(
     layers_ = recHitTools_->lastLayerBarrel() + 1;  //EB + 4 HB
 }
 
-template <typename HIT, template CLUSTER>
-ticl::association LCToSCAssociatorByEnergyScoreImpl<HIT>::makeConnections(
+template <typename HIT, typename CLUSTER>
+ticl::association LCToSCAssociatorByEnergyScoreImpl<HIT, CLUSTER>::makeConnections(
     const edm::Handle<CLUSTER>& cCCH, const edm::Handle<SimClusterCollection>& sCCH) const {
   // Get collections
   const auto& clusters = *cCCH.product();
@@ -526,10 +526,10 @@ ticl::association LCToSCAssociatorByEnergyScoreImpl<HIT>::makeConnections(
   return {scsInLayerCluster, lcsInSimCluster};
 }
 
-template <typename HIT, template CLUSTER>
-ticl::RecoToSimCollectionWithSimClusters LCToSCAssociatorByEnergyScoreImpl<HIT>::associateRecoToSim(
+template <typename HIT, typename CLUSTER>
+ticl::RecoToSimCollectionWithSimClusters_T<CLUSTER> LCToSCAssociatorByEnergyScoreImpl<HIT, CLUSTER>::associateRecoToSim(
     const edm::Handle<CLUSTER>& cCCH, const edm::Handle<SimClusterCollection>& sCCH) const {
-  ticl::RecoToSimCollectionWithSimClusters returnValue(productGetter_);
+  ticl::RecoToSimCollectionWithSimClusters_T<CLUSTER> returnValue(productGetter_);
   const auto& links = makeConnections(cCCH, sCCH);
 
   const auto& scsInLayerCluster = std::get<0>(links);
@@ -547,10 +547,10 @@ ticl::RecoToSimCollectionWithSimClusters LCToSCAssociatorByEnergyScoreImpl<HIT>:
   return returnValue;
 }
 
-template <typename HIT, template CLUSTER>
-ticl::SimToRecoCollectionWithSimClusters LCToSCAssociatorByEnergyScoreImpl<HIT>::associateSimToReco(
+template <typename HIT, typename CLUSTER>
+ticl::SimToRecoCollectionWithSimClusters_T<CLUSTER> LCToSCAssociatorByEnergyScoreImpl<HIT, CLUSTER>::associateSimToReco(
     const edm::Handle<CLUSTER>& cCCH, const edm::Handle<SimClusterCollection>& sCCH) const {
-  ticl::SimToRecoCollectionWithSimClusters returnValue(productGetter_);
+  ticl::SimToRecoCollectionWithSimClusters_T<CLUSTER> returnValue(productGetter_);
   const auto& links = makeConnections(cCCH, sCCH);
   const auto& lcsInSimCluster = std::get<1>(links);
   for (size_t scId = 0; scId < lcsInSimCluster.size(); ++scId) {

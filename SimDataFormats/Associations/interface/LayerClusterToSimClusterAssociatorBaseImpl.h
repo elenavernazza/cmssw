@@ -25,6 +25,13 @@ namespace ticl {
   using RecoToSimCollectionWithSimClusters_T = edm::AssociationMap<
       edm::OneToManyWithQualityGeneric<CLUSTER, SimClusterCollection, float>>;
 
+  // Default
+  typedef edm::AssociationMap<
+      edm::OneToManyWithQualityGeneric<SimClusterCollection, reco::CaloClusterCollection, std::pair<float, float>>>
+      SimToRecoCollectionWithSimClusters;
+  typedef edm::AssociationMap<edm::OneToManyWithQualityGeneric<reco::CaloClusterCollection, SimClusterCollection, float>>
+      RecoToSimCollectionWithSimClusters;
+
   template <typename CLUSTER>
   class LayerClusterToSimClusterAssociatorBaseImpl {
   public:

@@ -61,8 +61,8 @@ namespace ticl {
   typedef std::tuple<layerClusterToSimCluster, simClusterToLayerCluster> association;
 }  // namespace ticl
 
-template <typename HIT, template CLUSTER>
-class LCToSCAssociatorByEnergyScoreImpl : public ticl::LayerClusterToSimClusterAssociatorBaseImpl {
+template <typename HIT, typename CLUSTER>
+class LCToSCAssociatorByEnergyScoreImpl : public ticl::LayerClusterToSimClusterAssociatorBaseImpl<CLUSTER> {
 public:
   explicit LCToSCAssociatorByEnergyScoreImpl(edm::EDProductGetter const &,
                                              bool,
@@ -70,11 +70,11 @@ public:
                                              const std::unordered_map<DetId, const unsigned int> *,
                                              std::vector<const HIT *> &hits);
 
-  ticl::RecoToSimCollectionWithSimClusters associateRecoToSim(
+  ticl::RecoToSimCollectionWithSimClusters_T<CLUSTER> associateRecoToSim(
       const edm::Handle<CLUSTER> &cCH,
       const edm::Handle<SimClusterCollection> &sCCH) const override;
 
-  ticl::SimToRecoCollectionWithSimClusters associateSimToReco(
+  ticl::SimToRecoCollectionWithSimClusters_T<CLUSTER> associateSimToReco(
       const edm::Handle<CLUSTER> &cCH,
       const edm::Handle<SimClusterCollection> &sCCH) const override;
 
