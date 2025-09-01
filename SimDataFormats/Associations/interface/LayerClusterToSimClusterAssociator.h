@@ -13,9 +13,12 @@
 
 namespace ticl {
 
+  template <typename CLUSTER>
   class LayerClusterToSimClusterAssociator {
   public:
-    LayerClusterToSimClusterAssociator(std::unique_ptr<ticl::LayerClusterToSimClusterAssociatorBaseImpl>);
+    explicit LayerClusterToSimClusterAssociator(
+      std::unique_ptr<LayerClusterToSimClusterAssociatorBaseImpl<CLUSTER>> impl)
+      : m_impl(std::move(impl)) {}
     LayerClusterToSimClusterAssociator() = default;
     LayerClusterToSimClusterAssociator(LayerClusterToSimClusterAssociator &&) = default;
     LayerClusterToSimClusterAssociator &operator=(LayerClusterToSimClusterAssociator &&) = default;
@@ -26,21 +29,27 @@ namespace ticl {
         delete;  // stop default
     // ---------- const member functions ---------------------
     /// Associate a LayerCluster to SimClusters
-    ticl::RecoToSimCollectionWithSimClusters associateRecoToSim(const edm::Handle<reco::CaloClusterCollection> &cCCH,
+    RecoToSimCollectionWithSimClusters_T<CLUSTER> associateRecoToSim(const edm::Handle<CLUSTER> &cCCH,
                                                                 const edm::Handle<SimClusterCollection> &sCCH) const {
       return m_impl->associateRecoToSim(cCCH, sCCH);
     };
 
     /// Associate a SimCluster to LayerClusters
-    ticl::SimToRecoCollectionWithSimClusters associateSimToReco(const edm::Handle<reco::CaloClusterCollection> &cCCH,
+    SimToRecoCollectionWithSimClusters_T<CLUSTER> associateSimToReco(const edm::Handle<CLUSTER> &cCCH,
                                                                 const edm::Handle<SimClusterCollection> &sCCH) const {
       return m_impl->associateSimToReco(cCCH, sCCH);
     }
 
   private:
     // ---------- member data --------------------------------
-    std::unique_ptr<LayerClusterToSimClusterAssociatorBaseImpl> m_impl;
+    std::unique_ptr<LayerClusterToSimClusterAssociatorBaseImpl<CLUSTER>> m_impl;
   };
 }  // namespace ticl
+
+extern template class ticl::LayerClusterToSimClusterAssociator<reco::CaloClusterCollection>;
+// extern template class ticl::LayerClusterToSimClusterAssociator<reco::PFClusterCollection>;
+
+using LayerClusterToSimClusterAssociator = ticl::LayerClusterToSimClusterAssociator<reco::CaloClusterCollection>;
+// using PFClusterToSimClusterAssociator = ticl::LayerClusterToSimClusterAssociator<reco::PFClusterCollection>;
 
 #endif

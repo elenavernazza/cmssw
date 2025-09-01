@@ -116,3 +116,5 @@ void LCToSCAssociatorEDProducer::fillDescriptions(edm::ConfigurationDescriptions
 
 // define this as a plug-in
 DEFINE_FWK_MODULE(LCToSCAssociatorEDProducer);
+
+// FIXME: add new one for PFClusters

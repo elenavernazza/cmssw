@@ -25,6 +25,7 @@ protected:
   void analyze(const edm::Event&, const edm::EventSetup&) override;
 
   edm::EDGetTokenT<reco::PFCandidateCollection> PFCandToken_;
+  edm::EDGetTokenT<reco::PFClusterCollection> PFClusterHCALToken_;
   edm::EDGetTokenT<edm::ValueMap<float>> puppiWeightsToken_;
   edm::EDGetTokenT<std::vector<double>> puppiRawAlphasToken_;
   edm::EDGetTokenT<std::vector<double>> puppiAlphasToken_;
@@ -73,6 +74,7 @@ protected:
 
 PFTester::PFTester(const edm::ParameterSet &iConfig) 
     : PFCandToken_(consumes<reco::PFCandidateCollection>(iConfig.getParameter<edm::InputTag>("PFCand"))),
+      PFClusterHCALToken_(consumes<reco::PFClusterCollection>(iConfig.getParameter<edm::InputTag>("PFClusterHCAL"))),
       puppiWeightsToken_(consumes<edm::ValueMap<float>>(iConfig.getParameter<edm::InputTag>("puppiWeights"))),
       puppiRawAlphasToken_(consumes<std::vector<double>>(iConfig.getParameter<edm::InputTag>("puppiRawAlphas"))),
       puppiAlphasToken_(consumes<std::vector<double>>(iConfig.getParameter<edm::InputTag>("puppiAlphas"))),
@@ -127,6 +129,16 @@ void PFTester::bookHistograms(DQMStore::IBooker& ibook, edm::Run const&, edm::Ev
 }
 
 void PFTester::analyze(const edm::Event &iEvent, const edm::EventSetup &) {
+
+  edm::Handle<reco::PFClusterCollection> PFClusterHCAL;
+  iEvent.getByToken(PFClusterHCALToken_, PFClusterHCAL);
+  if (!PFClusterHCAL.isValid()) {
+    edm::LogInfo("PFTester") << "Input PFClusterHCAL collection not found.";
+    return;
+  }
+  else {
+    std::cout << "PFClusterHCAL size: " << PFClusterHCAL->size() << std::endl;
+  }
 
   const reco::PFCandidateCollection *pf_candidates; 
   edm::Handle<reco::PFCandidateCollection> PFCand;

@@ -3,17 +3,25 @@
 #include "SimDataFormats/Associations/interface/LayerClusterToSimClusterAssociatorBaseImpl.h"
 
 namespace ticl {
-  LayerClusterToSimClusterAssociatorBaseImpl::LayerClusterToSimClusterAssociatorBaseImpl() {}
-  LayerClusterToSimClusterAssociatorBaseImpl::~LayerClusterToSimClusterAssociatorBaseImpl() {}
+  template <typename CLUSTER>
+  LayerClusterToSimClusterAssociatorBaseImpl<CLUSTER>::LayerClusterToSimClusterAssociatorBaseImpl() {}
+  template <typename CLUSTER>
+  LayerClusterToSimClusterAssociatorBaseImpl<CLUSTER>::~LayerClusterToSimClusterAssociatorBaseImpl() {}
 
-  ticl::RecoToSimCollectionWithSimClusters LayerClusterToSimClusterAssociatorBaseImpl::associateRecoToSim(
-      const edm::Handle<reco::CaloClusterCollection> &cCCH, const edm::Handle<SimClusterCollection> &sCCH) const {
-    return ticl::RecoToSimCollectionWithSimClusters();
+  template <typename CLUSTER>
+  RecoToSimCollectionWithSimClusters_T<CLUSTER> LayerClusterToSimClusterAssociatorBaseImpl<CLUSTER>::associateRecoToSim(
+      const edm::Handle<CLUSTER> &cCCH, const edm::Handle<SimClusterCollection> &sCCH) const {
+    return RecoToSimCollectionWithSimClusters_T<CLUSTER>();
   }
 
-  ticl::SimToRecoCollectionWithSimClusters LayerClusterToSimClusterAssociatorBaseImpl::associateSimToReco(
-      const edm::Handle<reco::CaloClusterCollection> &cCCH, const edm::Handle<SimClusterCollection> &sCCH) const {
-    return ticl::SimToRecoCollectionWithSimClusters();
+  template <typename CLUSTER>
+  SimToRecoCollectionWithSimClusters_T<CLUSTER> LayerClusterToSimClusterAssociatorBaseImpl<CLUSTER>::associateSimToReco(
+      const edm::Handle<CLUSTER>> &cCCH, const edm::Handle<SimClusterCollection> &sCCH) const {
+    return SimToRecoCollectionWithSimClusters_T<CLUSTER>();
   }
+
+  template class ticl::LayerClusterToSimClusterAssociatorBaseImpl<reco::CaloClusterCollection>;
+  // template class ticl::LayerClusterToSimClusterAssociatorBaseImpl<reco::PFClusterCollection>;
 
 }  // namespace ticl
+

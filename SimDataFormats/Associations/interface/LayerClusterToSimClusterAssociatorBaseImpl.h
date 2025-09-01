@@ -18,12 +18,14 @@
 
 namespace ticl {
 
-  typedef edm::AssociationMap<
-      edm::OneToManyWithQualityGeneric<SimClusterCollection, reco::CaloClusterCollection, std::pair<float, float>>>
-      SimToRecoCollectionWithSimClusters;
-  typedef edm::AssociationMap<edm::OneToManyWithQualityGeneric<reco::CaloClusterCollection, SimClusterCollection, float>>
-      RecoToSimCollectionWithSimClusters;
+  template <typename CLUSTER> 
+  using SimToRecoCollectionWithSimClusters_T = edm::AssociationMap<
+      edm::OneToManyWithQualityGeneric<SimClusterCollection, CLUSTER, std::pair<float, float>>>;
+  template <typename CLUSTER>
+  using RecoToSimCollectionWithSimClusters_T = edm::AssociationMap<
+      edm::OneToManyWithQualityGeneric<CLUSTER, SimClusterCollection, float>>;
 
+  template <typename CLUSTER>
   class LayerClusterToSimClusterAssociatorBaseImpl {
   public:
     /// Constructor
@@ -32,13 +34,15 @@ namespace ticl {
     virtual ~LayerClusterToSimClusterAssociatorBaseImpl();
 
     /// Associate a LayerCluster to SimClusters
-    virtual ticl::RecoToSimCollectionWithSimClusters associateRecoToSim(
-        const edm::Handle<reco::CaloClusterCollection> &cCH, const edm::Handle<SimClusterCollection> &sCCH) const;
+    virtual RecoToSimCollectionWithSimClusters_T<CLUSTER> associateRecoToSim(
+        const edm::Handle<CLUSTER> &cCH, const edm::Handle<SimClusterCollection> &sCCH) const;
 
     /// Associate a SimCluster to LayerClusters
-    virtual ticl::SimToRecoCollectionWithSimClusters associateSimToReco(
-        const edm::Handle<reco::CaloClusterCollection> &cCH, const edm::Handle<SimClusterCollection> &sCCH) const;
+    virtual SimToRecoCollectionWithSimClusters_T<CLUSTER> associateSimToReco(
+        const edm::Handle<CLUSTER> &cCH, const edm::Handle<SimClusterCollection> &sCCH) const;
   };
 }  // namespace ticl
+
+extern template class ticl::LayerClusterToSimClusterAssociatorBaseImpl<reco::CaloClusterCollection>;
 
 #endif

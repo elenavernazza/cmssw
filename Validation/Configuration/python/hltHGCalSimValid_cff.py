@@ -17,7 +17,8 @@ hits = ["hltHGCalRecHit:HGCEERecHits",
         "hltHGCalRecHit:HGCHEFRecHits",
         "hltHGCalRecHit:HGCHEBRecHits",
         "hltParticleFlowRecHitECALUnseeded",
-        "hltParticleFlowRecHitHBHE"]
+        "hltParticleFlowRecHitHBHE"
+        ]
 hltRecHitMapProducer = _recHitMapProducer.clone(
     hits = hits,
     hgcalOnly = False,

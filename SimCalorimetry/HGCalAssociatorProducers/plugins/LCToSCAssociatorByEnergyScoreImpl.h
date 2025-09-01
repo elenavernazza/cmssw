@@ -61,7 +61,7 @@ namespace ticl {
   typedef std::tuple<layerClusterToSimCluster, simClusterToLayerCluster> association;
 }  // namespace ticl
 
-template <typename HIT>
+template <typename HIT, template CLUSTER>
 class LCToSCAssociatorByEnergyScoreImpl : public ticl::LayerClusterToSimClusterAssociatorBaseImpl {
 public:
   explicit LCToSCAssociatorByEnergyScoreImpl(edm::EDProductGetter const &,
@@ -71,11 +71,11 @@ public:
                                              std::vector<const HIT *> &hits);
 
   ticl::RecoToSimCollectionWithSimClusters associateRecoToSim(
-      const edm::Handle<reco::CaloClusterCollection> &cCH,
+      const edm::Handle<CLUSTER> &cCH,
       const edm::Handle<SimClusterCollection> &sCCH) const override;
 
   ticl::SimToRecoCollectionWithSimClusters associateSimToReco(
-      const edm::Handle<reco::CaloClusterCollection> &cCH,
+      const edm::Handle<CLUSTER> &cCH,
       const edm::Handle<SimClusterCollection> &sCCH) const override;
 
 private:
@@ -84,13 +84,17 @@ private:
   const std::unordered_map<DetId, const unsigned int> *hitMap_;
   unsigned layers_;
   edm::EDProductGetter const *productGetter_;
-  ticl::association makeConnections(const edm::Handle<reco::CaloClusterCollection> &cCH,
+  ticl::association makeConnections(const edm::Handle<CLUSTER> &cCH,
                                     const edm::Handle<SimClusterCollection> &sCCH) const;
   std::vector<const HIT *> hits_;
 };
 
-extern template class LCToSCAssociatorByEnergyScoreImpl<HGCRecHit>;
-extern template class LCToSCAssociatorByEnergyScoreImpl<reco::PFRecHit>;
+extern template class LCToSCAssociatorByEnergyScoreImpl<HGCRecHit, reco::CaloClusterCollection>;
+extern template class LCToSCAssociatorByEnergyScoreImpl<reco::PFRecHit, reco::CaloClusterCollection>;
+// extern template class LCToSCAssociatorByEnergyScoreImpl<HGCRecHit, reco::PFClusterCollection>;
+// extern template class LCToSCAssociatorByEnergyScoreImpl<reco::PFRecHit, reco::PFClusterCollection>;
 
-using HGCalLCToSCAssociatorByEnergyScoreImpl = LCToSCAssociatorByEnergyScoreImpl<HGCRecHit>;
-using BarrelLCToSCAssociatorByEnergyScoreImpl = LCToSCAssociatorByEnergyScoreImpl<reco::PFRecHit>;
+using HGCalLCToSCAssociatorByEnergyScoreImpl = LCToSCAssociatorByEnergyScoreImpl<HGCRecHit, reco::CaloClusterCollection>;
+using BarrelLCToSCAssociatorByEnergyScoreImpl = LCToSCAssociatorByEnergyScoreImpl<reco::PFRecHit, reco::CaloClusterCollection>;
+// using HGCalPCToSCAssociatorByEnergyScoreImpl = LCToSCAssociatorByEnergyScoreImpl<HGCRecHit, reco::CaloClusterCollection>;
+// using BarrelPCToSCAssociatorByEnergyScoreImpl = LCToSCAssociatorByEnergyScoreImpl<reco::PFRecHit, reco::CaloClusterCollection>;

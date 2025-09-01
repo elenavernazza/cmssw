@@ -9,12 +9,14 @@ hltPFHBHEScAssocByEnergyScoreProducer = cms.EDProducer("BarrelLCToSCAssociatorBy
 
 hltPFClusterSimClusterAssociationProducer = _layerClusterSimClusterAssociationProducer.clone(
     associator = cms.InputTag("hltPFHBHEScAssocByEnergyScoreProducer"),
-    label_lcl = cms.InputTag("hltParticleFlowClusterECALUncorrected", "hltParticleFlowClusterHBHE"),
+    # label_lcl = cms.InputTag("hltParticleFlowClusterECALUncorrected"),
+    label_lcl = cms.InputTag("hltParticleFlowClusterHBHE"),
     label_scl = cms.InputTag("mix","MergedCaloTruth")
 )
 
 hltPFTester = cms.EDProducer("PFTester",
     PFCand = cms.InputTag("hltParticleFlowTmp"),
+    PFClusterHCAL = cms.InputTag("hltParticleFlowClusterHBHE"),
     puppiWeights = cms.InputTag("hltPFPuppi"),
     puppiRawAlphas = cms.InputTag("hltPFPuppi:PuppiRawAlphas"),
     puppiAlphas = cms.InputTag("hltPFPuppi:PuppiAlphas"),
