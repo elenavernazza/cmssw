@@ -1,5 +1,4 @@
 import FWCore.ParameterSet.Config as cms
-from SimCalorimetry.HGCalAssociatorProducers.LCToSCAssociation_cfi import layerClusterSimClusterAssociation as _layerClusterSimClusterAssociationProducer
 
 hltPFHBHEScAssocByEnergyScoreProducer = cms.EDProducer("BarrelLCToSCAssociatorByEnergyScoreProducer",
     hardScatterOnly = cms.bool(True),
@@ -7,7 +6,7 @@ hltPFHBHEScAssocByEnergyScoreProducer = cms.EDProducer("BarrelLCToSCAssociatorBy
     hits = cms.VInputTag("hltParticleFlowRecHitECALUnseeded", "hltParticleFlowRecHitHBHE"), # hltParticleFlowClusterHO
 )
 
-hltPFClusterSimClusterAssociationProducer = _layerClusterSimClusterAssociationProducer.clone(
+hltPFClusterSimClusterAssociationProducer =cms.EDProducer("LCToSCAssociatorEDProducer",
     associator = cms.InputTag("hltPFHBHEScAssocByEnergyScoreProducer"),
     # label_lcl = cms.InputTag("hltParticleFlowClusterECALUncorrected"),
     label_lcl = cms.InputTag("hltParticleFlowClusterHBHE"),

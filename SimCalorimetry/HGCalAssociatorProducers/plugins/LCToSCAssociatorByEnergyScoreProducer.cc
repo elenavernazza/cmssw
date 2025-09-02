@@ -3,7 +3,7 @@
 #include <memory>
 
 template <typename HIT, typename CLUSTER>
-LCToSCAssociatorByEnergyScoreProducer<HIT, CLUSTER>::LCToSCAssociatorByEnergyScoreProducer(const edm::ParameterSet &ps)
+LCToSCAssociatorByEnergyScoreProducerT<HIT, CLUSTER>::LCToSCAssociatorByEnergyScoreProducerT(const edm::ParameterSet &ps)
     : hitMap_(consumes<std::unordered_map<DetId, const unsigned int>>(ps.getParameter<edm::InputTag>("hitMapTag"))),
       caloGeometry_(esConsumes<CaloGeometry, CaloGeometryRecord>()),
       hardScatterOnly_(ps.getParameter<bool>("hardScatterOnly")),
@@ -18,14 +18,14 @@ LCToSCAssociatorByEnergyScoreProducer<HIT, CLUSTER>::LCToSCAssociatorByEnergySco
   rhtools_ = std::make_shared<hgcal::RecHitTools>();
 
   // Register the product
-  produces<ticl::LayerClusterToSimClusterAssociator<CLUSTER>>();
+  produces<ticl::LayerClusterToSimClusterAssociatorT<CLUSTER>>();
 }
 
 template <typename HIT, typename CLUSTER>
-LCToSCAssociatorByEnergyScoreProducer<HIT, CLUSTER>::~LCToSCAssociatorByEnergyScoreProducer() {}
+LCToSCAssociatorByEnergyScoreProducerT<HIT, CLUSTER>::~LCToSCAssociatorByEnergyScoreProducerT() {}
 
 template <typename HIT, typename CLUSTER>
-void LCToSCAssociatorByEnergyScoreProducer<HIT, CLUSTER>::produce(edm::StreamID,
+void LCToSCAssociatorByEnergyScoreProducerT<HIT, CLUSTER>::produce(edm::StreamID,
                                                          edm::Event &iEvent,
                                                          const edm::EventSetup &es) const {
   edm::ESHandle<CaloGeometry> geom = es.getHandle(caloGeometry_);
@@ -39,7 +39,7 @@ void LCToSCAssociatorByEnergyScoreProducer<HIT, CLUSTER>::produce(edm::StreamID,
 
       // Check handle validity
       if (!hits_handle.isValid()) {
-        edm::LogWarning("LCToSCAssociatorByEnergyScoreProducer")
+        edm::LogWarning("LCToSCAssociatorByEnergyScoreProducerT")
             << "HGCAL Hit collection not available for token. Skipping this collection.";
         continue;  // Skip invalid handle
       }
@@ -55,7 +55,7 @@ void LCToSCAssociatorByEnergyScoreProducer<HIT, CLUSTER>::produce(edm::StreamID,
 
       // Check handle validity
       if (!hits_handle.isValid()) {
-        edm::LogWarning("LCToSCAssociatorByEnergyScoreProducer")
+        edm::LogWarning("LCToSCAssociatorByEnergyScoreProducerT")
             << "Barrel Hit collection not available for token. Skipping this collection.";
         continue;  // Skip invalid handle
       }
@@ -67,22 +67,22 @@ void LCToSCAssociatorByEnergyScoreProducer<HIT, CLUSTER>::produce(edm::StreamID,
   }
 
   if (hits.empty()) {
-    edm::LogWarning("LCToSCAssociatorByEnergyScoreProducer") << "No hits collected. Producing empty associator.";
-    auto emptyAssociator = std::make_unique<ticl::LayerClusterToSimClusterAssociator<CLUSTER>>();
+    edm::LogWarning("LCToSCAssociatorByEnergyScoreProducerT") << "No hits collected. Producing empty associator.";
+    auto emptyAssociator = std::make_unique<ticl::LayerClusterToSimClusterAssociatorT<CLUSTER>>();
     iEvent.put(std::move(emptyAssociator));
     return;
   }
 
   const auto hitMap = &iEvent.get(hitMap_);
 
-  auto impl = std::make_unique<LCToSCAssociatorByEnergyScoreImpl<HIT, CLUSTER>>(
+  auto impl = std::make_unique<LCToSCAssociatorByEnergyScoreImplT<HIT, CLUSTER>>(
       iEvent.productGetter(), hardScatterOnly_, rhtools_, hitMap, hits);
-  auto toPut = std::make_unique<ticl::LayerClusterToSimClusterAssociator<CLUSTER>>(std::move(impl));
+  auto toPut = std::make_unique<ticl::LayerClusterToSimClusterAssociatorT<CLUSTER>>(std::move(impl));
   iEvent.put(std::move(toPut));
 }
 
 template <typename HIT, typename CLUSTER>
-void LCToSCAssociatorByEnergyScoreProducer<HIT, CLUSTER>::fillDescriptions(edm::ConfigurationDescriptions &cfg) {
+void LCToSCAssociatorByEnergyScoreProducerT<HIT, CLUSTER>::fillDescriptions(edm::ConfigurationDescriptions &cfg) {
   edm::ParameterSetDescription desc;
   desc.add<bool>("hardScatterOnly", true);
   if constexpr (std::is_same_v<HIT, HGCRecHit>) {

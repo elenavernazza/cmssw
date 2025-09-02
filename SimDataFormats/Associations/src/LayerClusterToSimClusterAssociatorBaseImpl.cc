@@ -4,24 +4,24 @@
 
 namespace ticl {
   template <typename CLUSTER>
-  LayerClusterToSimClusterAssociatorBaseImpl<CLUSTER>::LayerClusterToSimClusterAssociatorBaseImpl() {}
+  LayerClusterToSimClusterAssociatorBaseImplT<CLUSTER>::LayerClusterToSimClusterAssociatorBaseImplT() {}
   template <typename CLUSTER>
-  LayerClusterToSimClusterAssociatorBaseImpl<CLUSTER>::~LayerClusterToSimClusterAssociatorBaseImpl() {}
+  LayerClusterToSimClusterAssociatorBaseImplT<CLUSTER>::~LayerClusterToSimClusterAssociatorBaseImplT() {}
 
   template <typename CLUSTER>
-  RecoToSimCollectionWithSimClusters_T<CLUSTER> LayerClusterToSimClusterAssociatorBaseImpl<CLUSTER>::associateRecoToSim(
+  RecoToSimCollectionWithSimClustersT<CLUSTER> LayerClusterToSimClusterAssociatorBaseImplT<CLUSTER>::associateRecoToSim(
       const edm::Handle<CLUSTER> &cCCH, const edm::Handle<SimClusterCollection> &sCCH) const {
-    return RecoToSimCollectionWithSimClusters_T<CLUSTER>();
+    return RecoToSimCollectionWithSimClustersT<CLUSTER>();
   }
 
   template <typename CLUSTER>
-  SimToRecoCollectionWithSimClusters_T<CLUSTER> LayerClusterToSimClusterAssociatorBaseImpl<CLUSTER>::associateSimToReco(
+  SimToRecoCollectionWithSimClustersT<CLUSTER> LayerClusterToSimClusterAssociatorBaseImplT<CLUSTER>::associateSimToReco(
       const edm::Handle<CLUSTER> &cCCH, const edm::Handle<SimClusterCollection> &sCCH) const {
-    return SimToRecoCollectionWithSimClusters_T<CLUSTER>();
+    return SimToRecoCollectionWithSimClustersT<CLUSTER>();
   }
 
-  template class ticl::LayerClusterToSimClusterAssociatorBaseImpl<reco::CaloClusterCollection>;
-  // template class ticl::LayerClusterToSimClusterAssociatorBaseImpl<reco::PFClusterCollection>;
+  template class ticl::LayerClusterToSimClusterAssociatorBaseImplT<reco::CaloClusterCollection>;
+  // template class ticl::LayerClusterToSimClusterAssociatorBaseImplT<reco::PFClusterCollection>;
 
 }  // namespace ticl
 
