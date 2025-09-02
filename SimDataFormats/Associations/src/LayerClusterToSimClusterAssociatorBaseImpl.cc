@@ -21,7 +21,7 @@ namespace ticl {
   }
 
   template class ticl::LayerClusterToSimClusterAssociatorBaseImplT<reco::CaloClusterCollection>;
-  // template class ticl::LayerClusterToSimClusterAssociatorBaseImplT<reco::PFClusterCollection>;
+  template class ticl::LayerClusterToSimClusterAssociatorBaseImplT<reco::PFClusterCollection>;
 
 }  // namespace ticl
 

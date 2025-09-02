@@ -10,6 +10,7 @@
 
 // user include files
 #include "DataFormats/CaloRecHit/interface/CaloClusterFwd.h"
+#include "DataFormats/ParticleFlowReco/interface/PFClusterFwd.h"
 #include "FWCore/Framework/interface/ESHandle.h"
 #include "FWCore/Framework/interface/Event.h"
 #include "FWCore/Framework/interface/MakerMacros.h"
@@ -121,5 +122,5 @@ void LCToSCAssociatorEDProducerT<CLUSTER>::fillDescriptions(edm::ConfigurationDe
 // define this as a plug-in
 typedef LCToSCAssociatorEDProducerT<reco::CaloClusterCollection> LCToSCAssociatorEDProducer;
 DEFINE_FWK_MODULE(LCToSCAssociatorEDProducer);
-// typedef LCToSCAssociatorEDProducerT<reco::PFClusterCollection> PCToSCAssociatorEDProducer;
-// DEFINE_FWK_MODULE(PCToSCAssociatorEDProducer);
+typedef LCToSCAssociatorEDProducerT<reco::PFClusterCollection> PCToSCAssociatorEDProducer;
+DEFINE_FWK_MODULE(PCToSCAssociatorEDProducer);
