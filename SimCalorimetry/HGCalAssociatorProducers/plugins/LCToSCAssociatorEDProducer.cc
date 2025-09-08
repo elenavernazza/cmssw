@@ -22,7 +22,7 @@
 #include "SimDataFormats/Associations/interface/LayerClusterToSimClusterAssociator.h"
 
 //
-// class decleration
+// class declaration
 //
 
 template <typename CLUSTER>

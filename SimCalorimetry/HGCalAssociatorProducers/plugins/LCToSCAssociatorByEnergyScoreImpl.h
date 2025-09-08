@@ -97,5 +97,5 @@ extern template class LCToSCAssociatorByEnergyScoreImplT<reco::PFRecHit, reco::P
 
 using HGCalLCToSCAssociatorByEnergyScoreImpl = LCToSCAssociatorByEnergyScoreImplT<HGCRecHit, reco::CaloClusterCollection>;
 using BarrelLCToSCAssociatorByEnergyScoreImpl = LCToSCAssociatorByEnergyScoreImplT<reco::PFRecHit, reco::CaloClusterCollection>;
-using HGCalPCToSCAssociatorByEnergyScoreImpl = LCToSCAssociatorByEnergyScoreImplT<HGCRecHit, reco::CaloClusterCollection>;
-using BarrelPCToSCAssociatorByEnergyScoreImpl = LCToSCAssociatorByEnergyScoreImplT<reco::PFRecHit, reco::CaloClusterCollection>;
+using HGCalPCToSCAssociatorByEnergyScoreImpl = LCToSCAssociatorByEnergyScoreImplT<HGCRecHit, reco::PFClusterCollection>;
+using BarrelPCToSCAssociatorByEnergyScoreImpl = LCToSCAssociatorByEnergyScoreImplT<reco::PFRecHit, reco::PFClusterCollection>;
