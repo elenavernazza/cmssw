@@ -82,10 +82,10 @@ void LCToSCAssociatorEDProducerT<CLUSTER>::produce(edm::StreamID, edm::Event &iE
   Handle<CLUSTER> LCCollection;
   iEvent.getByToken(LCCollectionToken_, LCCollection);
 
-  // Protection against missing CaloCluster collection
+  // Protection against missing cluster collection
   if (!LCCollection.isValid()) {
     edm::LogWarning("LCToSCAssociatorEDProducerT")
-        << "CaloCluster collection is unavailable. Producing empty associations.";
+        << "Cluster collection is unavailable. Producing empty associations.";
 
     // Return empty collections
     auto emptyRecSimColl = std::make_unique<ticl::RecoToSimCollectionWithSimClustersT<CLUSTER>>();
