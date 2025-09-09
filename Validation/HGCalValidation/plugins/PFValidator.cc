@@ -1,0 +1,565 @@
+#include <memory>
+
+#include "Validation/HGCalValidation/interface/PFValidator.h"
+
+#include "SimCalorimetry/HGCalAssociatorProducers/interface/AssociatorTools.h"
+
+#include "FWCore/Framework/interface/MakerMacros.h"
+#include "FWCore/MessageLogger/interface/MessageLogger.h"
+
+#include "FWCore/ParameterSet/interface/ConfigurationDescriptions.h"
+#include "FWCore/ParameterSet/interface/ParameterSetDescription.h"
+
+using namespace std;
+using namespace edm;
+using namespace ticl;
+
+PFValidator::PFValidator(const edm::ParameterSet& pset)
+  : caloGeomToken_(esConsumes<CaloGeometry, CaloGeometryRecord>()),
+	label_rcl(pset.getParameter<edm::InputTag>("label_rcl")),
+	associator_(pset.getUntrackedParameter<edm::InputTag>("associator")),
+	associatorSim_(pset.getUntrackedParameter<edm::InputTag>("associatorSim")),
+	SaveGeneralInfo_(pset.getUntrackedParameter<bool>("SaveGeneralInfo")),
+	doCaloParticlePlots_(pset.getUntrackedParameter<bool>("doCaloParticlePlots")),
+	doCaloParticleSelection_(pset.getUntrackedParameter<bool>("doCaloParticleSelection")),
+	doSimClustersPlots_(pset.getUntrackedParameter<bool>("doSimClustersPlots")),
+	label_SimClustersPlots_(pset.getParameter<edm::InputTag>("label_SimClusters")),
+	label_SimClustersLevel_(pset.getParameter<edm::InputTag>("label_SimClustersLevel")),
+	doRecoClustersPlots_(pset.getUntrackedParameter<bool>("doRecoClustersPlots")),
+	label_recoClustersPlots_(pset.getParameter<edm::InputTag>("label_recoClusterPlots")),
+	label_RCToCPLinking_(pset.getParameter<edm::InputTag>("label_RCToCPLinking")),
+	label_clustersmask(pset.getParameter<std::vector<edm::InputTag>>("RecoClustersInputMask")),
+	doCandidatesPlots_(pset.getUntrackedParameter<bool>("doCandidatesPlots")),
+	label_candidates_(pset.getParameter<std::string>("ticlCandidates")),
+  cummatbudinxo_(pset.getParameter<edm::FileInPath>("cummatbudinxo")),
+  hits_label_(pset.getParameter<std::vector<edm::InputTag>>("hits")) {
+  //In this way we can easily generalize to associations between other objects also.
+  const edm::InputTag& label_cp_effic_tag = pset.getParameter<edm::InputTag>("label_cp_effic");
+  const edm::InputTag& label_cp_fake_tag = pset.getParameter<edm::InputTag>("label_cp_fake");
+
+  for (auto& label : hits_label_) {
+    hits_tokens_.push_back(consumes<HGCRecHitCollection>(label));
+  }
+  label_cp_effic = consumes<std::vector<CaloParticle>>(label_cp_effic_tag);
+  label_cp_fake = consumes<std::vector<CaloParticle>>(label_cp_fake_tag);
+
+  simVertices_ = consumes<std::vector<SimVertex>>(pset.getParameter<edm::InputTag>("simVertices"));
+
+  for (auto& itag : label_clustersmask) {
+    clustersMaskTokens_.push_back(consumes<std::vector<float>>(itag));
+  }
+
+  hitMap_ = consumes<std::unordered_map<DetId, const unsigned int>>(pset.getParameter<edm::InputTag>("hitMap"));
+  simClusters_ = consumes<std::vector<SimCluster>>(pset.getParameter<edm::InputTag>("label_scl"));
+  recoClusters_ = consumes<reco::PFClusterCollection>(label_rcl);
+
+  // To add later: PFCandidateValidator.cc
+  // if (doCandidatesPlots_) {
+  //   candidateVal_ = std::make_unique<PFCandidateValidator>(PFCandidatesToken,
+  // 														   simPFCandidatesToken,
+  // 														   associator...);
+  // }
+
+  associatorMapSimtR = consumes<ticl::SimToRecoCollectionWithSimClustersT<reco::PFClusterCollection>>(associatorSim_);
+  associatorMapRtSim = consumes<ticl::RecoToSimCollectionWithSimClustersT<reco::PFClusterCollection>>(associatorSim_);
+  associatorMapRtS = consumes<ticl::RecoToSimCollectionT<reco::PFClusterCollection>>(associator_);
+  associatorMapStR = consumes<ticl::SimToRecoCollectionT<reco::PFClusterCollection>>(associator_);
+
+  cpSelector = CaloParticleSelector(pset.getParameter<double>("ptMinCP"),
+                                    pset.getParameter<double>("ptMaxCP"),
+                                    pset.getParameter<double>("minRapidityCP"),
+                                    pset.getParameter<double>("maxRapidityCP"),
+                                    pset.getParameter<double>("lipCP"),
+                                    pset.getParameter<double>("tipCP"),
+                                    pset.getParameter<int>("minHitCP"),
+                                    pset.getParameter<int>("maxSimClustersCP"),
+                                    pset.getParameter<bool>("signalOnlyCP"),
+                                    pset.getParameter<bool>("intimeOnlyCP"),
+                                    pset.getParameter<bool>("chargedOnlyCP"),
+                                    pset.getParameter<bool>("stableOnlyCP"),
+                                    pset.getParameter<bool>("notConvertedOnlyCP"),
+                                    pset.getParameter<std::vector<int>>("pdgIdCP"));
+
+  tools_ = std::make_shared<hgcal::RecHitTools>();
+
+  particles_to_monitor_ = pset.getParameter<std::vector<int>>("pdgIdCP");
+  totallayers_to_monitor_ = pset.getParameter<int>("totallayers_to_monitor");
+  thicknesses_to_monitor_ = pset.getParameter<std::vector<int>>("thicknesses_to_monitor");
+
+  //For the material budget file here
+  std::ifstream fmb(cummatbudinxo_.fullPath().c_str());
+  double thelay = 0.;
+  double mbg = 0.;
+  for (unsigned ilayer = 1; ilayer <= totallayers_to_monitor_; ++ilayer) {
+    fmb >> thelay >> mbg;
+    cumulative_material_budget.insert(std::pair<double, double>(thelay, mbg));
+  }
+
+  fmb.close();
+
+  ParameterSet psetForHistoProducerAlgo = pset.getParameter<ParameterSet>("histoProducerAlgoBlock");
+  histoProducerAlgo_ = std::make_unique<PFVHistoProducerAlgo>(psetForHistoProducerAlgo);
+
+  dirName_ = pset.getParameter<std::string>("dirName");
+}
+
+PFValidator::~PFValidator() {}
+
+void PFValidator::bookHistograms(DQMStore::IBooker& ibook,
+								 edm::Run const&,
+								 edm::EventSetup const& setup,
+								 Histograms& histograms) const {
+  if (SaveGeneralInfo_) {
+    ibook.cd();
+    ibook.setCurrentFolder(dirName_ + "GeneralInfo");
+    histoProducerAlgo_->bookInfo(ibook, histograms.histoProducerAlgo);
+  }
+
+  if (doCaloParticlePlots_) {
+    ibook.cd();
+
+    for (auto const particle : particles_to_monitor_) {
+      ibook.setCurrentFolder(dirName_ + "SelectedCaloParticles/" + std::to_string(particle));
+      histoProducerAlgo_->bookCaloParticleHistos(ibook, histograms.histoProducerAlgo, particle, totallayers_to_monitor_);
+    }
+    ibook.cd();
+    ibook.setCurrentFolder(dirName_);
+  }
+
+  //Booking histograms concerning with simClusters
+  if (doSimClustersPlots_) {
+    ibook.cd();
+    ibook.setCurrentFolder(dirName_ + label_SimClustersPlots_.label() + "/" + label_SimClustersLevel_.label());
+    histoProducerAlgo_->bookSimClusterHistos(ibook, histograms.histoProducerAlgo, totallayers_to_monitor_, thicknesses_to_monitor_);
+
+    for (unsigned int ws = 0; ws < label_clustersmask.size(); ws++) {
+      ibook.cd();
+      InputTag algo = label_clustersmask[ws];
+      string dirName = dirName_ + label_SimClustersPlots_.label() + "/";
+      if (!algo.process().empty())
+        dirName += algo.process() + "_";
+      LogDebug("PFValidator") << dirName << "\n";
+      if (!algo.label().empty())
+        dirName += algo.label() + "_";
+      LogDebug("PFValidator") << dirName << "\n";
+      if (!algo.instance().empty())
+        dirName += algo.instance() + "_";
+      LogDebug("PFValidator") << dirName << "\n";
+
+      if (!dirName.empty()) {
+        dirName.resize(dirName.size() - 1);
+      }
+
+      LogDebug("PFValidator") << dirName << "\n";
+
+      ibook.setCurrentFolder(dirName);
+
+      histoProducerAlgo_->bookSimClusterAssociationHistos(ibook, histograms.histoProducerAlgo, totallayers_to_monitor_, thicknesses_to_monitor_);
+    }  //end of loop over masks
+  }  //if for simCluster plots
+
+  //Booking histograms concerning with reco clusters
+  if (doRecoClustersPlots_) {
+    ibook.cd();
+    ibook.setCurrentFolder(dirName_ + label_recoClustersPlots_.label() + "/ClusterLevel");
+    histoProducerAlgo_->bookClusterHistos_ClusterLevel(ibook,
+                                                       histograms.histoProducerAlgo,
+                                                       totallayers_to_monitor_,
+                                                       thicknesses_to_monitor_,
+                                                       cummatbudinxo_.fullPath());
+    ibook.cd();
+    ibook.setCurrentFolder(dirName_ + label_recoClustersPlots_.label() + "/" + label_RCToCPLinking_.label());
+    histoProducerAlgo_->bookClusterHistos_RCtoCP_association(ibook, histograms.histoProducerAlgo, totallayers_to_monitor_);
+
+    ibook.cd();
+    ibook.setCurrentFolder(dirName_ + label_recoClustersPlots_.label() + "/CellLevel");
+    histoProducerAlgo_->bookClusterHistos_CellLevel(ibook, histograms.histoProducerAlgo, totallayers_to_monitor_, thicknesses_to_monitor_);
+  }
+
+  // Booking histograms concerning PF candidates
+  // if (doCandidatesPlots_) {
+  //   ibook.cd();
+  //   ibook.setCurrentFolder(dirName_ + label_candidates_);
+  //   candidateVal_->bookCandidatesHistos(ibook, histograms.histoTICLCandidates, dirName_ + label_candidates_);
+  // }
+}
+
+void PFValidator::cpParametersAndSelection(const Histograms& histograms,
+										   std::vector<CaloParticle> const& cPeff,
+										   std::vector<SimVertex> const& simVertices,
+										   std::vector<size_t>& selected_cPeff,
+										   unsigned int layers,
+										   std::unordered_map<DetId, const unsigned int> const& hitMap,
+										   MultiVectorManager<HGCRecHit> const& hits) const {
+  selected_cPeff.reserve(cPeff.size());
+
+  size_t j = 0;
+  for (auto const& caloParticle : cPeff) {
+    int id = caloParticle.pdgId();
+
+    if (!doCaloParticleSelection_ || (doCaloParticleSelection_ && cpSelector(caloParticle, simVertices))) {
+      selected_cPeff.push_back(j);
+      if (doCaloParticlePlots_) {
+        histoProducerAlgo_->fill_caloparticle_histos(
+													 histograms.histoProducerAlgo, id, caloParticle, simVertices, layers, hitMap, hits);
+      }
+    }
+    ++j;
+  }  //end of loop over caloparticles
+}
+
+void PFValidator::dqmAnalyze(const edm::Event& event,
+							 const edm::EventSetup& setup,
+							 const Histograms& histograms) const {
+  using namespace reco;
+
+  LogDebug("PFValidator") << "\n===================================================="
+						  << "\n"
+						  << "Analyzing new event"
+						  << "\n"
+						  << "====================================================\n"
+						  << "\n";
+
+  edm::Handle<std::vector<SimVertex>> simVerticesHandle;
+  event.getByToken(simVertices_, simVerticesHandle);
+  std::vector<SimVertex> const& simVertices = *simVerticesHandle;
+
+  edm::Handle<std::vector<CaloParticle>> caloParticleHandle;
+  event.getByToken(label_cp_effic, caloParticleHandle);
+  std::vector<CaloParticle> const& caloParticles = *caloParticleHandle;
+
+  edm::ESHandle<CaloGeometry> geom = setup.getHandle(caloGeomToken_);
+  tools_->setGeometry(*geom);
+  histoProducerAlgo_->setRecHitTools(tools_);
+
+  edm::Handle<ticl::SimToRecoCollectionT<reco::PFClusterCollection>> simtorecoCollectionH;
+  event.getByToken(associatorMapStR, simtorecoCollectionH);
+  const auto& simRecColl = *simtorecoCollectionH;
+  edm::Handle<ticl::RecoToSimCollectionT<reco::PFClusterCollection>> recotosimCollectionH;
+  event.getByToken(associatorMapRtS, recotosimCollectionH);
+  const auto& recSimColl = *recotosimCollectionH;
+
+  edm::Handle<std::unordered_map<DetId, const unsigned int>> hitMapHandle;
+  event.getByToken(hitMap_, hitMapHandle);
+  const std::unordered_map<DetId, const unsigned int>& hitMap = *hitMapHandle;
+
+  MultiVectorManager<HGCRecHit> rechitManager;
+  for (const auto& token : hits_tokens_) {
+    Handle<HGCRecHitCollection> hitsHandle;
+    event.getByToken(token, hitsHandle);
+    rechitManager.addVector(*hitsHandle);
+  }
+
+  //Some general info on layers etc.
+  if (SaveGeneralInfo_) {
+    histoProducerAlgo_->fill_info_histos(histograms.histoProducerAlgo, totallayers_to_monitor_);
+  }
+
+  std::vector<size_t> cPIndices;
+  //Consider CaloParticles coming from the hard scatterer
+  //excluding the PU contribution and save the indices.
+  removeCPFromPU(caloParticles, cPIndices);
+
+  // ##############################################
+  // Fill caloparticles histograms
+  // ##############################################
+  // HGCRecHit are given to select the SimHits which are also reconstructed
+  LogTrace("PFValidator") << "\n# of CaloParticles: " << caloParticles.size() << "\n" << std::endl;
+  std::vector<size_t> selected_cPeff;
+  cpParametersAndSelection(
+						   histograms, caloParticles, simVertices, selected_cPeff, totallayers_to_monitor_, hitMap, rechitManager);
+
+  //Sim Clusters
+  edm::Handle<std::vector<SimCluster>> simClustersHandle;
+  event.getByToken(simClusters_, simClustersHandle);
+  std::vector<SimCluster> const& simClusters = *simClustersHandle;
+
+  //Reco clusters
+  edm::Handle<reco::PFClusterCollection> recoClusterHandle;
+  event.getByToken(recoClusters_, recoClusterHandle);
+  const reco::PFClusterCollection& recoClusters = *recoClusterHandle;
+
+  auto nSimClusters = simClusters.size();
+  std::vector<size_t> sCIndices;
+  //There shouldn't be any SimTracks from different crossings, but maybe they will be added later.
+  //At the moment there should be one SimTrack in each SimCluster.
+  for (unsigned int scId = 0; scId < nSimClusters; ++scId) {
+    if (simClusters[scId].g4Tracks()[0].eventId().event() != 0 or
+        simClusters[scId].g4Tracks()[0].eventId().bunchCrossing() != 0) {
+      LogDebug("PFValidator") << "Excluding SimClusters from event: "
+							  << simClusters[scId].g4Tracks()[0].eventId().event()
+							  << " with BX: " << simClusters[scId].g4Tracks()[0].eventId().bunchCrossing()
+							  << std::endl;
+      continue;
+    }
+    sCIndices.emplace_back(scId);
+  }
+
+  // ##############################################
+  // Fill simCluster histograms
+  // ##############################################
+  if (doSimClustersPlots_) {
+    histoProducerAlgo_->fill_simCluster_histos(
+											   histograms.histoProducerAlgo, simClusters, totallayers_to_monitor_, thicknesses_to_monitor_);
+
+    for (unsigned int ws = 0; ws < label_clustersmask.size(); ws++) {
+      const auto& inputClusterMaskHandle = event.getHandle(clustersMaskTokens_[ws]);
+
+      if (!inputClusterMaskHandle.isValid()) {
+        edm::LogError("ClusterMaskError") << "Failed to retrieve clusters mask for ws index: " << ws;
+        continue;  // Or handle the error appropriately
+      }
+
+      const auto& inputClusterMask = *inputClusterMaskHandle;
+
+      edm::Handle<ticl::SimToRecoCollectionWithSimClustersT<reco::PFClusterCollection>> simtorecoCollectionH;
+      event.getByToken(associatorMapSimtR, simtorecoCollectionH);
+      auto simRecColl = *simtorecoCollectionH;
+      edm::Handle<ticl::RecoToSimCollectionWithSimClustersT<reco::PFClusterCollection>> recotosimCollectionH;
+      event.getByToken(associatorMapRtSim, recotosimCollectionH);
+      auto recSimColl = *recotosimCollectionH;
+
+      histoProducerAlgo_->fill_RecoClusters_to_SimClusters(histograms.histoProducerAlgo,
+														   ws,
+														   recoClusterHandle,
+														   recoClusters,
+														   simClustersHandle,
+														   simClusters,
+														   sCIndices,
+														   inputClusterMask,
+														   hitMap,
+														   totallayers_to_monitor_,
+														   recSimColl,
+														   simRecColl,
+														   rechitManager);
+
+      //General Info on simClusters
+      LogTrace("PFValidator") << "\n# of SimClusters: " << nSimClusters
+							  << ", recoClusters mask label: " << label_clustersmask[ws].label() << "\n";
+    }  //end of loop overs masks
+  }
+
+  // ##############################################
+  // Fill Reco Cluster histograms
+  // ##############################################
+  int w = 0;  //counter counting the number of sets of histograms
+  if (doRecoClustersPlots_) {
+    histoProducerAlgo_->fill_generic_cluster_histos(histograms.histoProducerAlgo,
+                                                    w,
+                                                    recoClusterHandle,
+                                                    recoClusters,
+                                                    caloParticleHandle,
+                                                    caloParticles,
+                                                    cPIndices,
+                                                    selected_cPeff,
+                                                    hitMap,
+                                                    cumulative_material_budget,
+                                                    totallayers_to_monitor_,
+                                                    thicknesses_to_monitor_,
+                                                    recSimColl,
+                                                    simRecColl,
+                                                    rechitManager);
+
+    for (unsigned int recoClusterIndex = 0; recoClusterIndex < recoClusters.size(); recoClusterIndex++) {
+      histoProducerAlgo_->fill_cluster_histos(histograms.histoProducerAlgo, w, recoClusters[recoClusterIndex]);
+    }
+
+    //General Info on Reco Clusters
+    LogTrace("PFValidator") << "\n# of Reco Clusters with " << label_rcl.process() << ":" << label_rcl.label()
+							<< ":" << label_rcl.instance() << ": " << recoClusters.size() << "\n";
+  }
+
+  // To add later: PFCandidateValidator.cc
+  // if (doCandidatesPlots_) {
+  //   candidateVal_->fillCandidateHistos(event, histograms.histoTICLCandidates, simTracksterFromCPHandle);
+  // }
+}
+
+void PFValidator::fillDescriptions(edm::ConfigurationDescriptions& descriptions) {
+  edm::ParameterSetDescription desc;
+  desc.add<double>("ptMinCP", 0.5);
+  desc.add<double>("ptMaxCP", 300.0);
+  desc.add<double>("minRapidityCP", -3.1);
+  desc.add<double>("maxRapidityCP", 3.1);
+  desc.add<double>("lipCP", 30.0);
+  desc.add<double>("tipCP", 60);
+  desc.add<bool>("chargedOnlyCP", false);
+  desc.add<bool>("stableOnlyCP", false);
+  desc.add<bool>("notConvertedOnlyCP", true);
+  desc.add<std::vector<int>>("pdgIdCP",
+                             {
+							   11,
+							   -11,
+							   13,
+							   -13,
+							   22,
+							   111,
+							   211,
+							   -211,
+							   321,
+							   -321,
+							   311,
+							   130,
+							   310,
+                             });
+  desc.add<bool>("signalOnlyCP", true);
+  desc.add<bool>("intimeOnlyCP", true);
+  desc.add<int>("minHitCP", 0);
+  desc.add<int>("maxSimClustersCP", -1);
+  {
+    edm::ParameterSetDescription psd1;
+    psd1.add<double>("minEta", -4.5);
+    psd1.add<double>("maxEta", 4.5);
+    psd1.add<int>("nintEta", 100);
+    psd1.add<bool>("useFabsEta", false);
+    psd1.add<double>("minEne", 0.0);
+    psd1.add<double>("maxEne", 500.0);
+    psd1.add<int>("nintEne", 250);
+    psd1.add<double>("minPt", 0.0);
+    psd1.add<double>("maxPt", 100.0);
+    psd1.add<int>("nintPt", 100);
+    psd1.add<double>("minPhi", -3.2);
+    psd1.add<double>("maxPhi", 3.2);
+    psd1.add<int>("nintPhi", 80);
+    psd1.add<double>("minMixedHitsSimCluster", 0.0);
+    psd1.add<double>("maxMixedHitsSimCluster", 800.0);
+    psd1.add<int>("nintMixedHitsSimCluster", 100);
+    psd1.add<double>("minMixedHitsCluster", 0.0);
+    psd1.add<double>("maxMixedHitsCluster", 800.0);
+    psd1.add<int>("nintMixedHitsCluster", 100);
+    psd1.add<double>("minEneCl", 0.0);
+    psd1.add<double>("maxEneCl", 110.0);
+    psd1.add<int>("nintEneCl", 110);
+    psd1.add<double>("minLongDepBary", 0.0);
+    psd1.add<double>("maxLongDepBary", 110.0);
+    psd1.add<int>("nintLongDepBary", 110);
+    psd1.add<double>("minZpos", -550.0);
+    psd1.add<double>("maxZpos", 550.0);
+    psd1.add<int>("nintZpos", 1100);
+    psd1.add<double>("minTotNsimClsperlay", 0.0);
+    psd1.add<double>("maxTotNsimClsperlay", 50.0);
+    psd1.add<int>("nintTotNsimClsperlay", 50);
+    psd1.add<double>("minTotNClsperlay", 0.0);
+    psd1.add<double>("maxTotNClsperlay", 50.0);
+    psd1.add<int>("nintTotNClsperlay", 50);
+    psd1.add<double>("minEneClperlay", 0.0);
+    psd1.add<double>("maxEneClperlay", 110.0);
+    psd1.add<int>("nintEneClperlay", 110);
+    psd1.add<double>("minScore", 0.0);
+    psd1.add<double>("maxScore", 1.02);
+    psd1.add<int>("nintScore", 51);
+    psd1.add<double>("minSharedEneFrac", 0.0);
+    psd1.add<double>("maxSharedEneFrac", 1.02);
+    psd1.add<int>("nintSharedEneFrac", 51);
+    psd1.add<double>("minTSTSharedEneFracEfficiency", 0.5);
+    psd1.add<double>("minTSTSharedEneFrac", 0.0);
+    psd1.add<double>("maxTSTSharedEneFrac", 1.01);
+    psd1.add<int>("nintTSTSharedEneFrac", 101);
+    psd1.add<double>("minTotNsimClsperthick", 0.0);
+    psd1.add<double>("maxTotNsimClsperthick", 800.0);
+    psd1.add<int>("nintTotNsimClsperthick", 100);
+    psd1.add<double>("minTotNClsperthick", 0.0);
+    psd1.add<double>("maxTotNClsperthick", 800.0);
+    psd1.add<int>("nintTotNClsperthick", 100);
+    psd1.add<double>("minTotNcellsperthickperlayer", 0.0);
+    psd1.add<double>("maxTotNcellsperthickperlayer", 500.0);
+    psd1.add<int>("nintTotNcellsperthickperlayer", 100);
+    psd1.add<double>("minDisToSeedperthickperlayer", 0.0);
+    psd1.add<double>("maxDisToSeedperthickperlayer", 300.0);
+    psd1.add<int>("nintDisToSeedperthickperlayer", 100);
+    psd1.add<double>("minDisToSeedperthickperlayerenewei", 0.0);
+    psd1.add<double>("maxDisToSeedperthickperlayerenewei", 10.0);
+    psd1.add<int>("nintDisToSeedperthickperlayerenewei", 50);
+    psd1.add<double>("minDisToMaxperthickperlayer", 0.0);
+    psd1.add<double>("maxDisToMaxperthickperlayer", 300.0);
+    psd1.add<int>("nintDisToMaxperthickperlayer", 100);
+    psd1.add<double>("minDisToMaxperthickperlayerenewei", 0.0);
+    psd1.add<double>("maxDisToMaxperthickperlayerenewei", 50.0);
+    psd1.add<int>("nintDisToMaxperthickperlayerenewei", 50);
+    psd1.add<double>("minDisSeedToMaxperthickperlayer", 0.0);
+    psd1.add<double>("maxDisSeedToMaxperthickperlayer", 300.0);
+    psd1.add<int>("nintDisSeedToMaxperthickperlayer", 100);
+    psd1.add<double>("minClEneperthickperlayer", 0.0);
+    psd1.add<double>("maxClEneperthickperlayer", 10.0);
+    psd1.add<int>("nintClEneperthickperlayer", 100);
+    psd1.add<double>("minCellsEneDensperthick", 0.0);
+    psd1.add<double>("maxCellsEneDensperthick", 100.0);
+    psd1.add<int>("nintCellsEneDensperthick", 200);
+    psd1.add<double>("minTotNTSTs", 0.0);
+    psd1.add<double>("maxTotNTSTs", 50.0);
+    psd1.add<int>("nintTotNTSTs", 50);
+    psd1.add<double>("minTotNClsinTSTs", 0.0);
+    psd1.add<double>("maxTotNClsinTSTs", 400.0);
+    psd1.add<int>("nintTotNClsinTSTs", 100);
+
+    psd1.add<double>("minTotNClsinTSTsperlayer", 0.0);
+    psd1.add<double>("maxTotNClsinTSTsperlayer", 50.0);
+    psd1.add<int>("nintTotNClsinTSTsperlayer", 50);
+    psd1.add<double>("minMplofLCs", 0.0);
+    psd1.add<double>("maxMplofLCs", 20.0);
+    psd1.add<int>("nintMplofLCs", 20);
+    psd1.add<double>("minSizeCLsinTSTs", 0.0);
+    psd1.add<double>("maxSizeCLsinTSTs", 50.0);
+    psd1.add<int>("nintSizeCLsinTSTs", 50);
+    psd1.add<double>("minClEnepermultiplicity", 0.0);
+    psd1.add<double>("maxClEnepermultiplicity", 10.0);
+    psd1.add<int>("nintClEnepermultiplicity", 10);
+    psd1.add<double>("minX", -300.0);
+    psd1.add<double>("maxX", 300.0);
+    psd1.add<int>("nintX", 100);
+    psd1.add<double>("minY", -300.0);
+    psd1.add<double>("maxY", 300.0);
+    psd1.add<int>("nintY", 100);
+    psd1.add<double>("minZ", -550.0);
+    psd1.add<double>("maxZ", 550.0);
+    psd1.add<int>("nintZ", 1100);
+    desc.add<edm::ParameterSetDescription>("histoProducerAlgoBlock", psd1);
+  }
+  desc.add<std::vector<edm::InputTag>>("hits",
+                                       {
+										 edm::InputTag("HGCalRecHit", "HGCEERecHits"),
+										 edm::InputTag("HGCalRecHit", "HGCHEFRecHits"),
+										 edm::InputTag("HGCalRecHit", "HGCHEBRecHits"),
+                                       });
+  desc.add<edm::InputTag>("label_rcl", edm::InputTag("XXX")); /// hgcalMergeLayerClusters
+  desc.addUntracked<edm::InputTag>("associator", edm::InputTag("XXX")); // layerClusterCaloParticleAssociationProducer
+  desc.addUntracked<edm::InputTag>("associatorSim", edm::InputTag("XXX")); // layerClusterSimClusterAssociationProducer
+  desc.addUntracked<bool>("SaveGeneralInfo", true);
+  desc.addUntracked<bool>("doCaloParticlePlots", true);
+  desc.addUntracked<bool>("doCaloParticleSelection", true);
+  desc.addUntracked<bool>("doSimClustersPlots", true);
+  desc.add<edm::InputTag>("label_SimClusters", edm::InputTag("SimClusters"));
+  desc.add<edm::InputTag>("label_SimClustersLevel", edm::InputTag("ClusterLevel"));
+  desc.addUntracked<bool>("doRecoClustersPlots", true);
+  desc.add<edm::InputTag>("label_recoClusterPlots", edm::InputTag("XXX")); // hgcalMergeLayerClusters
+  desc.add<edm::InputTag>("label_RCToCPLinking", edm::InputTag("RCToCP_association"));
+  desc.add<std::string>("label_TS", "Morphology");
+  desc.add<std::string>("label_TSbyHitsCP", "TSbyHits_CP");
+  desc.add<std::string>("label_TSbyHits", "TSbyHits");
+  desc.add<std::string>("label_TSbyLCs", "TSbyLCs");
+  desc.add<std::string>("label_TSbyLCsCP", "TSbyLCs_CP");
+  desc.add<edm::InputTag>("simClustersToCaloParticlesMap",
+                          edm::InputTag("SimClusterToCaloParticleAssociation", "simClusterToCaloParticleMap"));
+  desc.addUntracked<bool>("doCandidatesPlots", true);
+  desc.add<std::string>("ticlCandidates", "ticlCandidates");
+  desc.add<edm::InputTag>("recoTracks", edm::InputTag("generalTracks"));
+  desc.add<edm::FileInPath>("cummatbudinxo", edm::FileInPath("Validation/HGCalValidation/data/D41.cumulative.xo"));
+  desc.add<edm::InputTag>("label_cp_effic", edm::InputTag("mix", "MergedCaloTruth"));
+  desc.add<edm::InputTag>("label_cp_fake", edm::InputTag("mix", "MergedCaloTruth"));
+  desc.add<edm::InputTag>("label_scl", edm::InputTag("mix", "MergedCaloTruth"));
+  desc.add<edm::InputTag>("simVertices", edm::InputTag("g4SimHits"));
+  desc.add<edm::InputTag>("hitMap", edm::InputTag("recHitMapProducer", "hgcalRecHitMap"));
+  desc.add<std::vector<edm::InputTag>>("RecoClustersInputMask",
+                                       {
+                                       });
+  desc.add<int>("totallayers_to_monitor", 52);
+  desc.add<std::vector<int>>("thicknesses_to_monitor",
+                             {
+							   120,
+							   200,
+							   300,
+							   -1,
+                             });
+  desc.add<std::string>("dirName", "PF/PFValidator/");
+  descriptions.add("pfValidator", desc);
+}
