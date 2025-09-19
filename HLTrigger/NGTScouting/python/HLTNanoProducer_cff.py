@@ -40,12 +40,14 @@ NanoGenTable = cms.Sequence(
     + slimmedGenJetsFlavourInfos
     + genJetTable
     + genJetFlavourTable
+    + hltSimVertexTable
 )
 
 hltNanoProducer = cms.Sequence(
     NanoGenTable
     #+ hltTriggerAcceptFilter
     + hltVertexTable
+    + hltPixelVertexTable
     + hltPixelTrackTable
     + hltGeneralTrackTable
     + hltEgammaPacker
@@ -69,6 +71,7 @@ dstNanoProducer = cms.Sequence(
     NanoGenTable
     + dstTriggerAcceptFilter
     + hltVertexTable
+    + hltPixelVertexTable
     + hltPixelTrackTable
     + hltGeneralTrackTable
     + hltEgammaPacker

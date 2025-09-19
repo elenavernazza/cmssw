@@ -28,6 +28,9 @@ typedef SimpleFlatTableProducer<reco::GenJet> SimpleGenJetFlatTableProducer;
 #include "DataFormats/VertexReco/interface/Vertex.h"
 typedef SimpleFlatTableProducer<reco::Vertex> SimpleVertexFlatTableProducer;
 
+#include "SimDataFormats/TrackingAnalysis/interface/TrackingVertex.h"
+typedef SimpleFlatTableProducer<TrackingVertex> SimpleTrackingVertexFlatTableProducer;
+
 #include "DataFormats/Candidate/interface/VertexCompositePtrCandidate.h"
 typedef SimpleFlatTableProducer<reco::VertexCompositePtrCandidate> SimpleSecondaryVertexFlatTableProducer;
 
@@ -87,6 +90,7 @@ DEFINE_FWK_MODULE(SimpleSuperclusterFlatTableProducer);
 DEFINE_FWK_MODULE(SimplePFJetFlatTableProducer);
 DEFINE_FWK_MODULE(SimpleGenJetFlatTableProducer);
 DEFINE_FWK_MODULE(SimpleVertexFlatTableProducer);
+DEFINE_FWK_MODULE(SimpleTrackingVertexFlatTableProducer);
 DEFINE_FWK_MODULE(SimpleSecondaryVertexFlatTableProducer);
 DEFINE_FWK_MODULE(SimpleGenParticleFlatTableProducer);
 DEFINE_FWK_MODULE(SimpleCandidate2CandidateFlatTableProducer);
