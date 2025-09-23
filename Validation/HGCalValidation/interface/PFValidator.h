@@ -1,7 +1,7 @@
-#ifndef HGCalValidator_h
-#define HGCalValidator_h
+#ifndef PFValidator_h
+#define PFValidator_h
 
-/** \class HGCalValidator
+/** \class PFValidator
  *  Class that produces histograms to validate HGCal Reconstruction performances
  *
  *  \author HGCal

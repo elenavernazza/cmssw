@@ -13,6 +13,14 @@ hltPFClusterSimClusterAssociationProducer = cms.EDProducer("PCToSCAssociatorEDPr
     label_scl = cms.InputTag("mix","MergedCaloTruth")
 )
 
+hltPFValidator = cms.EDProducer("PFValidator",
+    label_rcl = cms.InputTag("hltParticleFlowClusterHBHE"),
+    associator = cms.untracked.InputTag("hltPFClusterSimClusterAssociationProducer"),
+    associatorSim = cms.untracked.InputTag("hltPFClusterSimClusterAssociationProducer"),
+    label_scl = cms.InputTag("mix","MergedCaloTruth"),
+    doCaloParticlePlots = cms.untracked.bool(False),
+)
+
 hltPFTester = cms.EDProducer("PFTester",
     PFCand = cms.InputTag("hltParticleFlowTmp"),
     PFClusterHCAL = cms.InputTag("hltParticleFlowClusterHBHE"),
@@ -26,5 +34,6 @@ hltPFTester = cms.EDProducer("PFTester",
 PFValSeq = cms.Sequence(
     hltPFHBHEScAssocByEnergyScoreProducer
     +hltPFClusterSimClusterAssociationProducer
+    +hltPFValidator
     +hltPFTester
 )
