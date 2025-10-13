@@ -69,11 +69,18 @@ protected:
   MonitorElement* h_PFClusterHitDetId_;
 
   std::unordered_map<std::string, std::tuple<unsigned, float, float>> histoVars = {
-      {"Eta", std::make_tuple(50, -6.5, 6.5)}};
-  std::unordered_map<std::string, MonitorElement*> h_simClusters_;
-  std::unordered_map<std::string, MonitorElement*> h_simClustersMatchedRecoClusters_;
-  std::unordered_map<std::string, MonitorElement*> h_recoClusters_;
-  std::unordered_map<std::string, MonitorElement*> h_recoClustersMatchedSimClusters_;
+      {"Energy", std::make_tuple(150, 0., 75.)},
+      {"Pt", std::make_tuple(100, 0., 50.)},
+      {"Eta", std::make_tuple(50, -6.5, 6.5)},
+      {"Phi", std::make_tuple(50, -3.5, 3.5)},
+      {"Mult", std::make_tuple(100, 0., 200.)},
+  };
+
+  using UMap = std::unordered_map<std::string, MonitorElement*>;
+  UMap h_simClusters_;
+  UMap h_simClustersMatchedRecoClusters_;
+  UMap h_recoClusters_;
+  UMap h_recoClustersMatchedSimClusters_;
 };
 
 PFTester::PFTester(const edm::ParameterSet& iConfig)
@@ -206,7 +213,11 @@ void PFTester::analyze(const edm::Event& iEvent, const edm::EventSetup&) {
 
   // efficiency computation
   for (unsigned int simId = 0; simId < simClusters.size(); ++simId) {
+    h_simClusters_["Energy"]->Fill(simClusters[simId].energy());
+    h_simClusters_["Pt"]->Fill(simClusters[simId].pt());
     h_simClusters_["Eta"]->Fill(simClusters[simId].eta());
+    h_simClusters_["Phi"]->Fill(simClusters[simId].phi());
+    h_simClusters_["Mult"]->Fill(simClusters[simId].numberOfSimHits());
 
     const edm::Ref<SimClusterCollection> simClusterRef(SimClusterHCAL, simId);
     const auto& simToRecoIt = simToRecoAssoc.find(simClusterRef);
@@ -217,7 +228,11 @@ void PFTester::analyze(const edm::Event& iEvent, const edm::EventSetup&) {
     if (simToRecoMatched.empty())
       continue;
 
+    h_simClustersMatchedRecoClusters_["Energy"]->Fill(simClusters[simId].energy());
+    h_simClustersMatchedRecoClusters_["Pt"]->Fill(simClusters[simId].pt());
     h_simClustersMatchedRecoClusters_["Eta"]->Fill(simClusters[simId].eta());
+    h_simClustersMatchedRecoClusters_["Phi"]->Fill(simClusters[simId].phi());
+    h_simClustersMatchedRecoClusters_["Mult"]->Fill(simClusters[simId].numberOfSimHits());
 
     // for (const auto& recoPair : simToRecoMatched) {
     //   std::cout << " simToRecoAssoc simCluster id " << simId << " : matched recoCluster id = " << recoPair.first.index()
@@ -228,7 +243,11 @@ void PFTester::analyze(const edm::Event& iEvent, const edm::EventSetup&) {
 
   // fake rate computation
   for (unsigned int recoId = 0; recoId < recoClusters.size(); ++recoId) {
+    h_recoClusters_["Energy"]->Fill(recoClusters[recoId].energy());
+    h_recoClusters_["Pt"]->Fill(recoClusters[recoId].pt());
     h_recoClusters_["Eta"]->Fill(recoClusters[recoId].eta());
+    h_recoClusters_["Phi"]->Fill(recoClusters[recoId].phi());
+    h_recoClusters_["Mult"]->Fill(recoClusters[recoId].size());
 
     const edm::Ref<reco::PFClusterCollection> recoClusterRef(PFClusterHCAL, recoId);
     const auto& recoToSimIt = recoToSimAssoc.find(recoClusterRef);
@@ -239,7 +258,11 @@ void PFTester::analyze(const edm::Event& iEvent, const edm::EventSetup&) {
     if (recoToSimMatched.empty())
       continue;
 
+    h_recoClustersMatchedSimClusters_["Energy"]->Fill(recoClusters[recoId].energy());
+    h_recoClustersMatchedSimClusters_["Pt"]->Fill(recoClusters[recoId].pt());
     h_recoClustersMatchedSimClusters_["Eta"]->Fill(recoClusters[recoId].eta());
+    h_recoClustersMatchedSimClusters_["Phi"]->Fill(recoClusters[recoId].phi());
+    h_recoClustersMatchedSimClusters_["Mult"]->Fill(recoClusters[recoId].size());
 
     // for (const auto& simPair : recoToSimMatched) {
     //   std::cout << " recoToSimAssoc simCluster id " << recoId << " : matched recoCluster id = " << recoPair.first.index()

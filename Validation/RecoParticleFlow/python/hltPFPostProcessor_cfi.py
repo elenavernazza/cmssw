@@ -15,7 +15,11 @@ hltPFClusterPostProcessor = DQMEDHarvester("DQMGenericClient",
     # ),
     efficiencyProfile = cms.untracked.vstring( # for smoother rebinning
         # Efficiency
+        "Eff_vs_Energy 'Efficiency vs Energy' SimClustersMatchedRecoClustersEnergy SimClustersEnergy ",
+        "Eff_vs_Pt 'Efficiency vs p_{T}' SimClustersMatchedRecoClustersPt SimClustersPt ",
         "Eff_vs_Eta 'Efficiency vs #eta' SimClustersMatchedRecoClustersEta SimClustersEta ",
+        "Eff_vs_Phi 'Efficiency vs #phi' SimClustersMatchedRecoClustersPhi SimClustersPhi ",
+        "Eff_vs_Mult 'Efficiency vs Multiplicity' SimClustersMatchedRecoClustersMult SimClustersMult ",
         # # Fake rate
         # "Fake_vs_Eta 'Fake Rate vs #eta' MatchedJetEta JetEta fake",
         # # Duplicate rate
