@@ -190,7 +190,7 @@ void PFTester::analyze(const edm::Event& iEvent, const edm::EventSetup&) {
     return;
   }
   auto simToRecoAssoc = *SimToRecoAssociatorHCALCollection;
-  std::cout << "simRecColl size : " << simToRecoAssoc.size() << std::endl;
+  // std::cout << "simRecColl size : " << simToRecoAssoc.size() << std::endl;
   
   edm::Handle<ticl::RecoToSimCollectionWithSimClustersT<reco::PFClusterCollection>> RecoToSimAssociatorHCALCollection;
   iEvent.getByToken(RecoToSimAssociatorHCALToken_, RecoToSimAssociatorHCALCollection);
@@ -199,7 +199,7 @@ void PFTester::analyze(const edm::Event& iEvent, const edm::EventSetup&) {
     return;
   }
   auto recoToSimAssoc = *RecoToSimAssociatorHCALCollection;
-  std::cout << "recoSimColl size : " << recoToSimAssoc.size() << std::endl;
+  // std::cout << "recoSimColl size : " << recoToSimAssoc.size() << std::endl;
 
   // efficiency computation
   for (unsigned int simId = 0; simId < simClusters.size(); ++simId) {
@@ -259,7 +259,7 @@ void PFTester::analyze(const edm::Event& iEvent, const edm::EventSetup&) {
     edm::LogInfo("PFTester") << "Input PFClusterCpClusterAssociatorHCAL RecoToSim collection not found.";
   } else {
     auto recCpColl = *RecoToCpAssociatorHCALCollection;
-    std::cout << "recCpColl size : " << recCpColl.size() << std::endl;
+    // std::cout << "recCpColl size : " << recCpColl.size() << std::endl;
 
     for (unsigned int cId = 0; cId < recoClusters.size(); ++cId) {
       const edm::Ref<reco::PFClusterCollection> clusterRef(PFClusterHCAL, cId);
@@ -269,8 +269,8 @@ void PFTester::analyze(const edm::Event& iEvent, const edm::EventSetup&) {
       const auto& scs = scsIt->val;
       if (!scs.empty()) {
         for (const auto& scPair : scs) {
-          std::cout << " recCpColl Cluster id " << cId << " : first=" << scPair.first.index()
-                    << " second=" << scPair.second << std::endl;
+          // std::cout << " recCpColl Cluster id " << cId << " : first=" << scPair.first.index()
+          //           << " second=" << scPair.second << std::endl;
         }
       }
     }
@@ -283,7 +283,7 @@ void PFTester::analyze(const edm::Event& iEvent, const edm::EventSetup&) {
     edm::LogInfo("PFTester") << "Input PFClusterCpClusterAssociatorHCAL SimToReco collection not found.";
   } else {
     auto CpRecColl = *CpToRecoAssociatorHCALCollection;
-    std::cout << "CpRecColl size : " << CpRecColl.size() << std::endl;
+    // std::cout << "CpRecColl size : " << CpRecColl.size() << std::endl;
   }
 
   // --------------------------------------------------------------------
