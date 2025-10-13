@@ -15,6 +15,7 @@
 #include "DataFormats/ParticleFlowReco/interface/PFCluster.h"
 #include "SimDataFormats/CaloAnalysis/interface/CaloParticle.h"
 #include "SimDataFormats/CaloAnalysis/interface/SimCluster.h"
+#include "SimDataFormats/CaloAnalysis/interface/SimClusterFwd.h"
 #include "SimDataFormats/Associations/interface/LayerClusterToSimClusterAssociator.h"
 #include "SimDataFormats/Associations/interface/LayerClusterToCaloParticleAssociator.h"
 #include "FWCore/MessageLogger/interface/MessageLogger.h"
@@ -30,7 +31,7 @@ protected:
 
   edm::EDGetTokenT<reco::PFCandidateCollection> PFCandToken_;
   edm::EDGetTokenT<reco::PFClusterCollection> PFClusterHCALToken_;
-  edm::EDGetTokenT<std::vector<SimCluster>> SimClusterHCALToken_;
+  edm::EDGetTokenT<SimClusterCollection> SimClusterHCALToken_;
   edm::EDGetTokenT<ticl::RecoToSimCollectionWithSimClustersT<reco::PFClusterCollection>> RecoToSimAssociatorHCALToken_;
   edm::EDGetTokenT<ticl::SimToRecoCollectionWithSimClustersT<reco::PFClusterCollection>> SimToRecoAssociatorHCALToken_;
   edm::EDGetTokenT<ticl::RecoToSimCollectionT<reco::PFClusterCollection>> RecoToCpAssociatorHCALToken_;
@@ -66,12 +67,18 @@ protected:
   MonitorElement* h_PFClusterType_;
   MonitorElement* h_PFClusterHitFraction_;
   MonitorElement* h_PFClusterHitDetId_;
+
+  std::unordered_map<std::string, std::tuple<unsigned, float, float>> histoVars = {{"Eta", std::make_tuple(50, -6.5, 6.5)}};
+  std::unordered_map<std::string, MonitorElement*> h_simClusters_;
+  std::unordered_map<std::string, MonitorElement*> h_simClustersMatchedRecoClusters_;
+  std::unordered_map<std::string, MonitorElement*> h_recoClusters_;
+  std::unordered_map<std::string, MonitorElement*> h_recoClustersMatchedSimClusters_;
 };
 
 PFTester::PFTester(const edm::ParameterSet& iConfig)
     : PFCandToken_(consumes<reco::PFCandidateCollection>(iConfig.getParameter<edm::InputTag>("PFCand"))),
       PFClusterHCALToken_(consumes<reco::PFClusterCollection>(iConfig.getParameter<edm::InputTag>("PFClusterHCAL"))),
-      SimClusterHCALToken_(consumes<std::vector<SimCluster>>(iConfig.getParameter<edm::InputTag>("SimClusterHCAL"))),
+      SimClusterHCALToken_(consumes<SimClusterCollection>(iConfig.getParameter<edm::InputTag>("SimClusterHCAL"))),
       RecoToSimAssociatorHCALToken_(consumes<ticl::RecoToSimCollectionWithSimClustersT<reco::PFClusterCollection>>(
           iConfig.getParameter<edm::InputTag>("PFClusterSimClusterAssociatorHCAL"))),
       SimToRecoAssociatorHCALToken_(consumes<ticl::SimToRecoCollectionWithSimClustersT<reco::PFClusterCollection>>(
@@ -117,17 +124,29 @@ void PFTester::bookHistograms(DQMStore::IBooker& ibook, edm::Run const&, edm::Ev
   h_PFClusterHitFraction_ = ibook.book1D("PFClusterHitFraction", "PFCluster Hit Fraction;Fraction", 100, 0.0, 1.1);
   h_PFClusterHitDetId_ =
       ibook.book1D("PFClusterHitDetId", "PFCluster Hit DetId modulo 10000;DetId mod 10000", 100, 0, 10000);
+
+  ibook.setCurrentFolder("HLT/ParticleFlow/PFClusterValidation");
+  for (auto& hVar : histoVars) {
+	h_simClusters_[hVar.first] = ibook.book1D("SimClusters" + hVar.first, "SimClusters;" + hVar.first,
+											 std::get<0>(hVar.second), std::get<1>(hVar.second), std::get<2>(hVar.second));
+	h_simClustersMatchedRecoClusters_[hVar.first] = ibook.book1D("SimClustersMatchedRecoClusters" + hVar.first,
+																"SimClusters matched to RecoClusters;" + hVar.first,
+																std::get<0>(hVar.second), std::get<1>(hVar.second), std::get<2>(hVar.second));
+	h_recoClusters_[hVar.first] = ibook.book1D("RecoClusters" + hVar.first, "RecoClusters;" + hVar.first,
+											   std::get<0>(hVar.second), std::get<1>(hVar.second), std::get<2>(hVar.second));
+
+	h_recoClustersMatchedSimClusters_[hVar.first] = ibook.book1D("RecoClustersMatchedSimClusters" + hVar.first,
+																"RecoClusters matched to SimClusters;" + hVar.first,
+																std::get<0>(hVar.second), std::get<1>(hVar.second), std::get<2>(hVar.second));
+  }
 }
 
+
 void PFTester::analyze(const edm::Event& iEvent, const edm::EventSetup&) {
-  edm::Handle<reco::PFClusterCollection> PFClusterHCAL;
-  iEvent.getByToken(PFClusterHCALToken_, PFClusterHCAL);
-  if (!PFClusterHCAL.isValid()) {
-    edm::LogInfo("PFTester") << "Input PFClusterHCAL collection not found.";
-    return;
-  }
-  auto clusters = *PFClusterHCAL;
-  std::cout << "PFClusterHCAL size: " << clusters.size() << std::endl;
+
+  // --------------------------------------------------------------------
+  // ---------------- PF Candidates -------------------------------------
+  // --------------------------------------------------------------------
 
   const reco::PFCandidateCollection* pf_candidates;
   edm::Handle<reco::PFCandidateCollection> PFCand;
@@ -142,32 +161,27 @@ void PFTester::analyze(const edm::Event& iEvent, const edm::EventSetup&) {
     edm::LogInfo("PFTester") << " Failed to retrieve data required by PFTester.cc";
     return;
   }
-
+	 
   // --------------------------------------------------------------------
+  // ---------------- PF Cluster Efficiency -----------------------------
   // --------------------------------------------------------------------
 
-  edm::Handle<ticl::RecoToSimCollectionWithSimClustersT<reco::PFClusterCollection>> RecoToSimAssociatorHCALCollection;
-  iEvent.getByToken(RecoToSimAssociatorHCALToken_, RecoToSimAssociatorHCALCollection);
-  if (!RecoToSimAssociatorHCALCollection.isValid()) {
-    edm::LogInfo("PFTester") << "Input PFClusterSimClusterAssociatorHCAL RecoToSim collection not found.";
+  edm::Handle<reco::PFClusterCollection> PFClusterHCAL;
+  iEvent.getByToken(PFClusterHCALToken_, PFClusterHCAL);
+  if (!PFClusterHCAL.isValid()) {
+    edm::LogInfo("PFTester") << "Input PFClusterHCAL collection not found.";
     return;
   }
-  auto recSimColl = *RecoToSimAssociatorHCALCollection;
-  std::cout << "recSimColl size : " << recSimColl.size() << std::endl;
+  auto recoClusters = *PFClusterHCAL;
 
-  for (unsigned int cId = 0; cId < clusters.size(); ++cId) {
-    const edm::Ref<reco::PFClusterCollection> clusterRef(PFClusterHCAL, cId);
-    const auto& scsIt = recSimColl.find(clusterRef);
-    if (scsIt == recSimColl.end())
-      continue;
-    const auto& scs = scsIt->val;
-    if (!scs.empty()) {
-      for (const auto& scPair : scs) {
-        std::cout << " recSimColl Cluster id " << cId << " : first=" << scPair.first.index()
-                  << " second=" << scPair.second << std::endl;
-      }
-    }
+  edm::Handle<SimClusterCollection> SimClusterHCAL;
+  iEvent.getByToken(SimClusterHCALToken_, SimClusterHCAL);
+  if (!SimClusterHCAL.isValid()) {
+    edm::LogInfo("PFTester") << "Input SimClusterHCAL collection not found.";
+    return;
   }
+  auto simClusters = *SimClusterHCAL;
+
 
   edm::Handle<ticl::SimToRecoCollectionWithSimClustersT<reco::PFClusterCollection>> SimToRecoAssociatorHCALCollection;
   iEvent.getByToken(SimToRecoAssociatorHCALToken_, SimToRecoAssociatorHCALCollection);
@@ -175,9 +189,66 @@ void PFTester::analyze(const edm::Event& iEvent, const edm::EventSetup&) {
     edm::LogInfo("PFTester") << "Input PFClusterSimClusterAssociatorHCAL SimToReco collection not found.";
     return;
   }
-  auto simRecColl = *SimToRecoAssociatorHCALCollection;
-  std::cout << "simRecColl size : " << simRecColl.size() << std::endl;
+  auto simToRecoAssoc = *SimToRecoAssociatorHCALCollection;
+  std::cout << "simRecColl size : " << simToRecoAssoc.size() << std::endl;
+  
+  edm::Handle<ticl::RecoToSimCollectionWithSimClustersT<reco::PFClusterCollection>> RecoToSimAssociatorHCALCollection;
+  iEvent.getByToken(RecoToSimAssociatorHCALToken_, RecoToSimAssociatorHCALCollection);
+  if (!RecoToSimAssociatorHCALCollection.isValid()) {
+    edm::LogInfo("PFTester") << "Input PFClusterSimClusterAssociatorHCAL RecoToSim collection not found.";
+    return;
+  }
+  auto recoToSimAssoc = *RecoToSimAssociatorHCALCollection;
+  std::cout << "recoSimColl size : " << recoToSimAssoc.size() << std::endl;
 
+  // efficiency computation
+  for (unsigned int simId = 0; simId < simClusters.size(); ++simId) {
+
+	h_simClusters_["Eta"]->Fill(simClusters[simId].eta());
+
+	const edm::Ref<SimClusterCollection> simClusterRef(SimClusterHCAL, simId);
+    const auto& simToRecoIt = simToRecoAssoc.find(simClusterRef);
+    if (simToRecoIt == simToRecoAssoc.end())
+      continue;
+    const auto& simToRecoMatched = simToRecoIt->val;
+
+    if (simToRecoMatched.empty())
+	  continue;
+
+	h_simClustersMatchedRecoClusters_["Eta"]->Fill(simClusters[simId].eta());
+	
+	// for (const auto& recoPair : simToRecoMatched) {
+	//   std::cout << " simToRecoAssoc simCluster id " << simId << " : matched recoCluster id = " << recoPair.first.index()
+	// 			<< " shared energy = " << recoPair.second.first
+	// 			<< " score = " << recoPair.second.second << std::endl; 
+    // }
+  }
+
+  // fake rate computation
+  for (unsigned int recoId = 0; recoId < recoClusters.size(); ++recoId) {
+
+	h_recoClusters_["Eta"]->Fill(recoClusters[recoId].eta());
+
+	const edm::Ref<reco::PFClusterCollection> recoClusterRef(PFClusterHCAL, recoId);
+    const auto& recoToSimIt = recoToSimAssoc.find(recoClusterRef);
+    if (recoToSimIt == recoToSimAssoc.end())
+      continue;
+    const auto& recoToSimMatched = recoToSimIt->val;
+
+    if (recoToSimMatched.empty())
+	  continue;
+
+	h_recoClustersMatchedSimClusters_["Eta"]->Fill(recoClusters[recoId].eta());
+	
+	// for (const auto& simPair : recoToSimMatched) {
+	//   std::cout << " recoToSimAssoc simCluster id " << recoId << " : matched recoCluster id = " << recoPair.first.index()
+	// 			<< " shared energy = " << recoPair.second.first
+	// 			<< " score = " << recoPair.second.second << std::endl; 
+    // }
+  }
+
+
+  
   // --------------------------------------------------------------------
   // --------------------------------------------------------------------
 
@@ -190,7 +261,7 @@ void PFTester::analyze(const edm::Event& iEvent, const edm::EventSetup&) {
     auto recCpColl = *RecoToCpAssociatorHCALCollection;
     std::cout << "recCpColl size : " << recCpColl.size() << std::endl;
 
-    for (unsigned int cId = 0; cId < clusters.size(); ++cId) {
+    for (unsigned int cId = 0; cId < recoClusters.size(); ++cId) {
       const edm::Ref<reco::PFClusterCollection> clusterRef(PFClusterHCAL, cId);
       const auto& scsIt = recCpColl.find(clusterRef);
       if (scsIt == recCpColl.end())
