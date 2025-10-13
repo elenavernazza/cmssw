@@ -35,11 +35,6 @@ protected:
   edm::EDGetTokenT<ticl::SimToRecoCollectionWithSimClustersT<reco::PFClusterCollection>> SimToRecoAssociatorHCALToken_;
   edm::EDGetTokenT<ticl::RecoToSimCollectionT<reco::PFClusterCollection>> RecoToCpAssociatorHCALToken_;
   edm::EDGetTokenT<ticl::SimToRecoCollectionT<reco::PFClusterCollection>> CpToRecoAssociatorHCALToken_;
-  edm::EDGetTokenT<edm::ValueMap<float>> puppiWeightsToken_;
-  edm::EDGetTokenT<std::vector<double>> puppiRawAlphasToken_;
-  edm::EDGetTokenT<std::vector<double>> puppiAlphasToken_;
-  edm::EDGetTokenT<std::vector<double>> puppiAlphasMedToken_;
-  edm::EDGetTokenT<std::vector<double>> puppiAlphasRmsToken_;
 
   MonitorElement* h_PFCandEt_;
   MonitorElement* h_PFCandEta_;
@@ -71,14 +66,6 @@ protected:
   MonitorElement* h_PFClusterType_;
   MonitorElement* h_PFClusterHitFraction_;
   MonitorElement* h_PFClusterHitDetId_;
-
-  MonitorElement* h_PuppiWeights_;
-  MonitorElement* h_PuppiWeightsCharged_;
-  MonitorElement* h_PuppiWeightsNeutral_;
-  MonitorElement* h_PuppiRawAlphas_;
-  MonitorElement* h_PuppiAlphas_;
-  MonitorElement* h_PuppiAlphasMed_;
-  MonitorElement* h_PuppiAlphasRms_;
 };
 
 PFTester::PFTester(const edm::ParameterSet& iConfig)
@@ -92,12 +79,7 @@ PFTester::PFTester(const edm::ParameterSet& iConfig)
       RecoToCpAssociatorHCALToken_(consumes<ticl::RecoToSimCollectionT<reco::PFClusterCollection>>(
           iConfig.getParameter<edm::InputTag>("PFClusterCaloParticleAssociatorHCAL"))),
       CpToRecoAssociatorHCALToken_(consumes<ticl::SimToRecoCollectionT<reco::PFClusterCollection>>(
-          iConfig.getParameter<edm::InputTag>("PFClusterCaloParticleAssociatorHCAL"))),
-      puppiWeightsToken_(consumes<edm::ValueMap<float>>(iConfig.getParameter<edm::InputTag>("puppiWeights"))),
-      puppiRawAlphasToken_(consumes<std::vector<double>>(iConfig.getParameter<edm::InputTag>("puppiRawAlphas"))),
-      puppiAlphasToken_(consumes<std::vector<double>>(iConfig.getParameter<edm::InputTag>("puppiAlphas"))),
-      puppiAlphasMedToken_(consumes<std::vector<double>>(iConfig.getParameter<edm::InputTag>("puppiAlphasMed"))),
-      puppiAlphasRmsToken_(consumes<std::vector<double>>(iConfig.getParameter<edm::InputTag>("puppiAlphasRms"))) {}
+          iConfig.getParameter<edm::InputTag>("PFClusterCaloParticleAssociatorHCAL"))) {}
 
 void PFTester::bookHistograms(DQMStore::IBooker& ibook, edm::Run const&, edm::EventSetup const&) {
   ibook.setCurrentFolder("HLT/ParticleFlow/PFCandidates");
@@ -107,14 +89,6 @@ void PFTester::bookHistograms(DQMStore::IBooker& ibook, edm::Run const&, edm::Ev
   h_PFCandCharge_ = ibook.book1D("PFCandCharge", "PFCandCharge", 5, -2, 2);
   h_PFCandPdgId_ = ibook.book1D("PFCandPdgId", "PFCandPdgId", 44, -22, 22);
   h_PFCandType_ = ibook.book1D("PFCandidateType", "PFCandidateType", 10, 0, 10);
-
-  h_PuppiWeights_ = ibook.book1D("PuppiWeights", "Puppi Weights", 100, 0., 1.);
-  h_PuppiWeightsCharged_ = ibook.book1D("PuppiWeightsCharged", "Puppi Weights (charged)", 100, 0., 1.);
-  h_PuppiWeightsNeutral_ = ibook.book1D("PuppiWeightsNeutral", "Puppi Weights (neutral)", 100, 0., 1.);
-  h_PuppiRawAlphas_ = ibook.book1D("PuppiRawAlphas", "Puppi Raw Alphas", 100, 0., 10.);
-  h_PuppiAlphas_ = ibook.book1D("PuppiAlphas", "Puppi Alphas", 100, 0., 10.);
-  h_PuppiAlphasMed_ = ibook.book1D("PuppiAlphasMed", "Puppi Alphas Median", 100, 0., 10.);
-  h_PuppiAlphasRms_ = ibook.book1D("PuppiAlphasRms", "Puppi Alphas RMS", 100, 0., 5.);
 
   ibook.setCurrentFolder("HLT/ParticleFlow/PFBlocks");
   h_NumElements_ = ibook.book1D("NumElements", "NumElements", 25, 0, 25);
@@ -242,15 +216,6 @@ void PFTester::analyze(const edm::Event& iEvent, const edm::EventSetup&) {
   }
 
   // --------------------------------------------------------------------
-  // --------------------------------------------------------------------
-
-  edm::Handle<edm::ValueMap<float>> puppiWeights;
-  iEvent.getByToken(puppiWeightsToken_, puppiWeights);
-  if (!puppiWeights.isValid()) {
-    edm::LogInfo("PFTester") << "Input puppiWeights collection not found.";
-  }
-
-  // --------------------------------------------------------------------
   // -------------------- PF Blocks and Elements ------------------------
   // --------------------------------------------------------------------
 
@@ -264,18 +229,6 @@ void PFTester::analyze(const edm::Event& iEvent, const edm::EventSetup&) {
     h_PFCandCharge_->Fill(particle.charge());
     h_PFCandPdgId_->Fill(particle.pdgId());
     h_PFCandType_->Fill(particle.particleId());
-
-    // Get Puppi weights
-    if (puppiWeights.isValid()) {
-      edm::Ref<reco::PFCandidateCollection> pfRef(PFCand, i);
-      float weight = (*puppiWeights)[pfRef];
-      h_PuppiWeights_->Fill(weight);
-      if (particle.charge() != 0) {
-        h_PuppiWeightsCharged_->Fill(weight);
-      } else {
-        h_PuppiWeightsNeutral_->Fill(weight);
-      }
-    }
 
     // Get the PFBlock and Elements
     const reco::PFCandidate::ElementsInBlocks& elementsInBlocks = particle.elementsInBlocks();
@@ -361,50 +314,6 @@ void PFTester::analyze(const edm::Event& iEvent, const edm::EventSetup&) {
     h_NumHCALElements_->Fill(numHCALElements);
     h_NumHGCALElements_->Fill(numHGCALElements);
   }
-
-  // --------------------------------------------------------------------
-  // --------------------------- Puppi Alphas ---------------------------
-  // --------------------------------------------------------------------
-  edm::Handle<std::vector<double>> rawAlphas;
-  iEvent.getByToken(puppiRawAlphasToken_, rawAlphas);
-  if (!rawAlphas.isValid()) {
-    edm::LogInfo("PFTester") << "Input puppiRawAlphas collection not found.";
-  } else {
-    for (auto const& val : *rawAlphas) {
-      h_PuppiRawAlphas_->Fill(val);
-    }
-  }
-
-  edm::Handle<std::vector<double>> alphas;
-  iEvent.getByToken(puppiAlphasToken_, alphas);
-  if (!alphas.isValid()) {
-    edm::LogInfo("PFTester") << "Input puppiAlphas collection not found.";
-  } else {
-    for (auto const& val : *alphas) {
-      h_PuppiAlphas_->Fill(val);
-    }
-  }
-
-  edm::Handle<std::vector<double>> alphasMed;
-  iEvent.getByToken(puppiAlphasMedToken_, alphasMed);
-  if (!alphasMed.isValid()) {
-    edm::LogInfo("PFTester") << "Input puppiAlphasMed collection not found.";
-  } else {
-    for (auto const& val : *alphasMed) {
-      h_PuppiAlphasMed_->Fill(val);
-    }
-  }
-
-  edm::Handle<std::vector<double>> alphasRms;
-  iEvent.getByToken(puppiAlphasRmsToken_, alphasRms);
-  if (!alphasRms.isValid()) {
-    edm::LogInfo("PFTester") << "Input puppiAlphasRms collection not found.";
-  } else {
-    for (auto const& val : *alphasRms) {
-      h_PuppiAlphasRms_->Fill(val);
-    }
-  }
-  // --------------------------------------------------------------------
 }
 
 DEFINE_FWK_MODULE(PFTester);

@@ -59,11 +59,6 @@ hltPFTester = cms.EDProducer("PFTester",
     SimClusterHCAL = cms.InputTag("mix","MergedCaloTruth"),
     PFClusterSimClusterAssociatorHCAL = cms.InputTag("hltPFClusterSimClusterAssociationProducer"),
     PFClusterCaloParticleAssociatorHCAL = cms.InputTag("hltPFClusterCaloParticleAssociationProducer"),
-    puppiWeights = cms.InputTag("hltPFPuppi"),
-    puppiRawAlphas = cms.InputTag("hltPFPuppi:PuppiRawAlphas"),
-    puppiAlphas = cms.InputTag("hltPFPuppi:PuppiAlphas"),
-    puppiAlphasMed = cms.InputTag("hltPFPuppi:PuppiAlphasMed"),
-    puppiAlphasRms = cms.InputTag("hltPFPuppi:PuppiAlphasRms"),
 )
 
 PFValSeq = cms.Sequence(
