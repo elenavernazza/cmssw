@@ -68,7 +68,8 @@ protected:
   MonitorElement* h_PFClusterHitFraction_;
   MonitorElement* h_PFClusterHitDetId_;
 
-  std::unordered_map<std::string, std::tuple<unsigned, float, float>> histoVars = {{"Eta", std::make_tuple(50, -6.5, 6.5)}};
+  std::unordered_map<std::string, std::tuple<unsigned, float, float>> histoVars = {
+      {"Eta", std::make_tuple(50, -6.5, 6.5)}};
   std::unordered_map<std::string, MonitorElement*> h_simClusters_;
   std::unordered_map<std::string, MonitorElement*> h_simClustersMatchedRecoClusters_;
   std::unordered_map<std::string, MonitorElement*> h_recoClusters_;
@@ -127,23 +128,26 @@ void PFTester::bookHistograms(DQMStore::IBooker& ibook, edm::Run const&, edm::Ev
 
   ibook.setCurrentFolder("HLT/ParticleFlow/PFClusterValidation");
   for (auto& hVar : histoVars) {
-	h_simClusters_[hVar.first] = ibook.book1D("SimClusters" + hVar.first, "SimClusters;" + hVar.first,
-											 std::get<0>(hVar.second), std::get<1>(hVar.second), std::get<2>(hVar.second));
-	h_simClustersMatchedRecoClusters_[hVar.first] = ibook.book1D("SimClustersMatchedRecoClusters" + hVar.first,
-																"SimClusters matched to RecoClusters;" + hVar.first,
-																std::get<0>(hVar.second), std::get<1>(hVar.second), std::get<2>(hVar.second));
-	h_recoClusters_[hVar.first] = ibook.book1D("RecoClusters" + hVar.first, "RecoClusters;" + hVar.first,
-											   std::get<0>(hVar.second), std::get<1>(hVar.second), std::get<2>(hVar.second));
+    auto [nBins, hMin, hMax] = hVar.second;
+    h_simClusters_[hVar.first] =
+        ibook.book1D("SimClusters" + hVar.first, "SimClusters;" + hVar.first, nBins, hMin, hMax);
+    h_simClustersMatchedRecoClusters_[hVar.first] = ibook.book1D("SimClustersMatchedRecoClusters" + hVar.first,
+                                                                 "SimClusters matched to RecoClusters;" + hVar.first,
+                                                                 nBins,
+                                                                 hMin,
+                                                                 hMax);
+    h_recoClusters_[hVar.first] =
+        ibook.book1D("RecoClusters" + hVar.first, "RecoClusters;" + hVar.first, nBins, hMin, hMax);
 
-	h_recoClustersMatchedSimClusters_[hVar.first] = ibook.book1D("RecoClustersMatchedSimClusters" + hVar.first,
-																"RecoClusters matched to SimClusters;" + hVar.first,
-																std::get<0>(hVar.second), std::get<1>(hVar.second), std::get<2>(hVar.second));
+    h_recoClustersMatchedSimClusters_[hVar.first] = ibook.book1D("RecoClustersMatchedSimClusters" + hVar.first,
+                                                                 "RecoClusters matched to SimClusters;" + hVar.first,
+                                                                 nBins,
+                                                                 hMin,
+                                                                 hMax);
   }
 }
 
-
 void PFTester::analyze(const edm::Event& iEvent, const edm::EventSetup&) {
-
   // --------------------------------------------------------------------
   // ---------------- PF Candidates -------------------------------------
   // --------------------------------------------------------------------
@@ -161,7 +165,7 @@ void PFTester::analyze(const edm::Event& iEvent, const edm::EventSetup&) {
     edm::LogInfo("PFTester") << " Failed to retrieve data required by PFTester.cc";
     return;
   }
-	 
+
   // --------------------------------------------------------------------
   // ---------------- PF Cluster Efficiency -----------------------------
   // --------------------------------------------------------------------
@@ -182,7 +186,6 @@ void PFTester::analyze(const edm::Event& iEvent, const edm::EventSetup&) {
   }
   auto simClusters = *SimClusterHCAL;
 
-
   edm::Handle<ticl::SimToRecoCollectionWithSimClustersT<reco::PFClusterCollection>> SimToRecoAssociatorHCALCollection;
   iEvent.getByToken(SimToRecoAssociatorHCALToken_, SimToRecoAssociatorHCALCollection);
   if (!SimToRecoAssociatorHCALCollection.isValid()) {
@@ -191,7 +194,7 @@ void PFTester::analyze(const edm::Event& iEvent, const edm::EventSetup&) {
   }
   auto simToRecoAssoc = *SimToRecoAssociatorHCALCollection;
   // std::cout << "simRecColl size : " << simToRecoAssoc.size() << std::endl;
-  
+
   edm::Handle<ticl::RecoToSimCollectionWithSimClustersT<reco::PFClusterCollection>> RecoToSimAssociatorHCALCollection;
   iEvent.getByToken(RecoToSimAssociatorHCALToken_, RecoToSimAssociatorHCALCollection);
   if (!RecoToSimAssociatorHCALCollection.isValid()) {
@@ -203,52 +206,48 @@ void PFTester::analyze(const edm::Event& iEvent, const edm::EventSetup&) {
 
   // efficiency computation
   for (unsigned int simId = 0; simId < simClusters.size(); ++simId) {
+    h_simClusters_["Eta"]->Fill(simClusters[simId].eta());
 
-	h_simClusters_["Eta"]->Fill(simClusters[simId].eta());
-
-	const edm::Ref<SimClusterCollection> simClusterRef(SimClusterHCAL, simId);
+    const edm::Ref<SimClusterCollection> simClusterRef(SimClusterHCAL, simId);
     const auto& simToRecoIt = simToRecoAssoc.find(simClusterRef);
     if (simToRecoIt == simToRecoAssoc.end())
       continue;
     const auto& simToRecoMatched = simToRecoIt->val;
 
     if (simToRecoMatched.empty())
-	  continue;
+      continue;
 
-	h_simClustersMatchedRecoClusters_["Eta"]->Fill(simClusters[simId].eta());
-	
-	// for (const auto& recoPair : simToRecoMatched) {
-	//   std::cout << " simToRecoAssoc simCluster id " << simId << " : matched recoCluster id = " << recoPair.first.index()
-	// 			<< " shared energy = " << recoPair.second.first
-	// 			<< " score = " << recoPair.second.second << std::endl; 
+    h_simClustersMatchedRecoClusters_["Eta"]->Fill(simClusters[simId].eta());
+
+    // for (const auto& recoPair : simToRecoMatched) {
+    //   std::cout << " simToRecoAssoc simCluster id " << simId << " : matched recoCluster id = " << recoPair.first.index()
+    // 			<< " shared energy = " << recoPair.second.first
+    // 			<< " score = " << recoPair.second.second << std::endl;
     // }
   }
 
   // fake rate computation
   for (unsigned int recoId = 0; recoId < recoClusters.size(); ++recoId) {
+    h_recoClusters_["Eta"]->Fill(recoClusters[recoId].eta());
 
-	h_recoClusters_["Eta"]->Fill(recoClusters[recoId].eta());
-
-	const edm::Ref<reco::PFClusterCollection> recoClusterRef(PFClusterHCAL, recoId);
+    const edm::Ref<reco::PFClusterCollection> recoClusterRef(PFClusterHCAL, recoId);
     const auto& recoToSimIt = recoToSimAssoc.find(recoClusterRef);
     if (recoToSimIt == recoToSimAssoc.end())
       continue;
     const auto& recoToSimMatched = recoToSimIt->val;
 
     if (recoToSimMatched.empty())
-	  continue;
+      continue;
 
-	h_recoClustersMatchedSimClusters_["Eta"]->Fill(recoClusters[recoId].eta());
-	
-	// for (const auto& simPair : recoToSimMatched) {
-	//   std::cout << " recoToSimAssoc simCluster id " << recoId << " : matched recoCluster id = " << recoPair.first.index()
-	// 			<< " shared energy = " << recoPair.second.first
-	// 			<< " score = " << recoPair.second.second << std::endl; 
+    h_recoClustersMatchedSimClusters_["Eta"]->Fill(recoClusters[recoId].eta());
+
+    // for (const auto& simPair : recoToSimMatched) {
+    //   std::cout << " recoToSimAssoc simCluster id " << recoId << " : matched recoCluster id = " << recoPair.first.index()
+    // 			<< " shared energy = " << recoPair.second.first
+    // 			<< " score = " << recoPair.second.second << std::endl;
     // }
   }
 
-
-  
   // --------------------------------------------------------------------
   // --------------------------------------------------------------------
 
@@ -266,13 +265,13 @@ void PFTester::analyze(const edm::Event& iEvent, const edm::EventSetup&) {
       const auto& scsIt = recCpColl.find(clusterRef);
       if (scsIt == recCpColl.end())
         continue;
-      const auto& scs = scsIt->val;
-      if (!scs.empty()) {
-        for (const auto& scPair : scs) {
-          // std::cout << " recCpColl Cluster id " << cId << " : first=" << scPair.first.index()
-          //           << " second=" << scPair.second << std::endl;
-        }
-      }
+      // const auto& scs = scsIt->val;
+      // if (!scs.empty()) {
+      //   for (const auto& scPair : scs) {
+      //     // std::cout << " recCpColl Cluster id " << cId << " : first=" << scPair.first.index()
+      //     //           << " second=" << scPair.second << std::endl;
+      //   }
+      // }
     }
   }
 
