@@ -1,70 +1,62 @@
 import FWCore.ParameterSet.Config as cms
 
-# lcAssocByEnergyScoreProducer = _lcAssocByEnergyScoreProducer.clone(hardScatterOnly = cms.bool(True))
-# scAssocByEnergyScoreProducer = _scAssocByEnergyScoreProducer.clone(hardScatterOnly = cms.bool(True))
+# For HCAL: currently hltParticleFlowClusterHBHE, but probably better hltParticleFlowClusterHCAL
+# For ECAL: currently hltParticleFlowClusterECALUnseeded, but probably better hltParticleFlowSuperClusterECALUnseeded
 
-# layerClusterCaloParticleAssociation = cms.EDProducer("LCToCPAssociatorEDProducer",
-#     associator = cms.InputTag('lcAssocByEnergyScoreProducer'),
-#     label_cp = cms.InputTag("mix","MergedCaloTruth"),
-#     label_lc = cms.InputTag("hgcalMergeLayerClusters")
-# )
-
-# hltLcAssocByEnergyScoreProducer = _lcAssocByEnergyScoreProducer.clone(
-#     hits = cms.VInputTag("hltHGCalRecHit:HGCEERecHits", "hltHGCalRecHit:HGCHEFRecHits", "hltHGCalRecHit:HGCHEBRecHits"),
-#     hitMapTag = cms.InputTag("hltRecHitMapProducer","hgcalRecHitMap"),
-# )
-
-# hltScAssocByEnergyScoreProducer = _scAssocByEnergyScoreProducer.clone(
-#     hits = cms.VInputTag("hltHGCalRecHit:HGCEERecHits", "hltHGCalRecHit:HGCHEFRecHits", "hltHGCalRecHit:HGCHEBRecHits"),
-#     hitMapTag = cms.InputTag("hltRecHitMapProducer","hgcalRecHitMap"),
-# )
-
-# hltLayerClusterCaloParticleAssociationProducer = layerClusterCaloParticleAssociation.clone(
-#     associator = cms.InputTag("hltLcAssocByEnergyScoreProducer"),
-#     label_lc = cms.InputTag("hltMergeLayerClusters")
-# )
-
-# hltLayerClusterSimClusterAssociationProducer = _layerClusterSimClusterAssociationProducer.clone(
-#     associator = cms.InputTag("hltScAssocByEnergyScoreProducer"),
-#     label_lcl = cms.InputTag("hltMergeLayerClusters")
-# )
-
-hltPFHBHEScAssocByEnergyScoreProducer = cms.EDProducer("BarrelPCToSCAssociatorByEnergyScoreProducer",
+hltPFScAssocByEnergyScoreProducer = cms.EDProducer("BarrelPCToSCAssociatorByEnergyScoreProducer",
     hardScatterOnly = cms.bool(True),
     hitMapTag = cms.InputTag("hltRecHitMapProducer:barrelRecHitMap"),
-    hits = cms.VInputTag("hltParticleFlowRecHitECALUnseeded", "hltParticleFlowRecHitHBHE"), # hltParticleFlowClusterHO
+    hits = cms.VInputTag("hltParticleFlowRecHitECALUnseeded", "hltParticleFlowRecHitHBHE") #, "hltParticleFlowRecHitHF", "hltParticleFlowRecHitHO")
 )
 
-hltPFClusterSimClusterAssociationProducer = cms.EDProducer("PCToSCAssociatorEDProducer",
-    associator = cms.InputTag("hltPFHBHEScAssocByEnergyScoreProducer"),
+hltPFClusterSimClusterAssociationProducerHBHE = cms.EDProducer("PCToSCAssociatorEDProducer",
+    associator = cms.InputTag("hltPFScAssocByEnergyScoreProducer"),
     label_lcl = cms.InputTag("hltParticleFlowClusterHBHE"),
-    label_scl = cms.InputTag("mix","MergedCaloTruth")
+    label_scl = cms.InputTag("mix","MergedCaloTruth") # FIXME: we will have different collections for ECAL and HCAL
 )
 
-hltPFHBHECpAssocByEnergyScoreProducer = cms.EDProducer("BarrelPCToCPAssociatorByEnergyScoreProducer",
+hltPFClusterSimClusterAssociationProducerECAL = cms.EDProducer("PCToSCAssociatorEDProducer",
+    associator = cms.InputTag("hltPFScAssocByEnergyScoreProducer"),
+    label_lcl = cms.InputTag("hltParticleFlowRecHitECALUnseeded"),
+    label_scl = cms.InputTag("mix","MergedCaloTruth") # FIXME: we will have different collections for ECAL and HCAL
+)
+
+hltPFCpAssocByEnergyScoreProducer = cms.EDProducer("BarrelPCToCPAssociatorByEnergyScoreProducer",
     hardScatterOnly = cms.bool(True),
     hitMapTag = cms.InputTag("hltRecHitMapProducer:barrelRecHitMap"),
-    hits = cms.VInputTag("hltParticleFlowRecHitECALUnseeded", "hltParticleFlowRecHitHBHE"), # hltParticleFlowClusterHO
+    hits = cms.VInputTag("hltParticleFlowRecHitECALUnseeded", "hltParticleFlowRecHitHBHE") #, "hltParticleFlowRecHitHF", "hltParticleFlowRecHitHO")
 )
 
-hltPFClusterCaloParticleAssociationProducer = cms.EDProducer("PCToCPAssociatorEDProducer",
-    associator = cms.InputTag("hltPFHBHECpAssocByEnergyScoreProducer"),
+hltPFClusterCaloParticleAssociationProducerHBHE = cms.EDProducer("PCToCPAssociatorEDProducer",
+    associator = cms.InputTag("hltPFCpAssocByEnergyScoreProducer"),
     label_lc = cms.InputTag("hltParticleFlowClusterHBHE"),
-    label_cp = cms.InputTag("mix","MergedCaloTruth")
+    label_cp = cms.InputTag("mix","MergedCaloTruth") # FIXME: we will have different collections for ECAL and HCAL
+)
+
+hltPFClusterCaloParticleAssociationProducerECAL = cms.EDProducer("PCToCPAssociatorEDProducer",
+    associator = cms.InputTag("hltPFCpAssocByEnergyScoreProducer"),
+    label_lc = cms.InputTag("hltParticleFlowRecHitECALUnseeded"),
+    label_cp = cms.InputTag("mix","MergedCaloTruth") # FIXME: we will have different collections for ECAL and HCAL
 )
 
 hltPFTester = cms.EDProducer("PFTester",
     PFCand = cms.InputTag("hltParticleFlowTmp"),
     PFClusterHCAL = cms.InputTag("hltParticleFlowClusterHBHE"),
-    SimClusterHCAL = cms.InputTag("mix","MergedCaloTruth"),
-    PFClusterSimClusterAssociatorHCAL = cms.InputTag("hltPFClusterSimClusterAssociationProducer"),
-    PFClusterCaloParticleAssociatorHCAL = cms.InputTag("hltPFClusterCaloParticleAssociationProducer"),
+    SimClusterHCAL = cms.InputTag("mix","MergedCaloTruth"), # FIXME: we will have different collections for ECAL and HCAL
+    PFClusterSimClusterAssociatorHCAL = cms.InputTag("hltPFClusterSimClusterAssociationProducerHBHE"),
+    PFClusterCaloParticleAssociatorHCAL = cms.InputTag("hltPFClusterCaloParticleAssociationProducerHBHE"),
+    PFClusterECAL = cms.InputTag("hltParticleFlowClusterECALUnseeded"),
+    SimClusterECAL = cms.InputTag("mix","MergedCaloTruth"), # FIXME: we will have different collections for ECAL and HCAL
+    PFClusterSimClusterAssociatorECAL = cms.InputTag("hltPFClusterSimClusterAssociationProducerECAL"),
+    PFClusterCaloParticleAssociatorECAL = cms.InputTag("hltPFClusterCaloParticleAssociationProducerECAL"),
 )
 
 PFValSeq = cms.Sequence(
-    hltPFHBHEScAssocByEnergyScoreProducer
-    +hltPFClusterSimClusterAssociationProducer
-    +hltPFHBHECpAssocByEnergyScoreProducer
-    +hltPFClusterCaloParticleAssociationProducer
+    hltPFScAssocByEnergyScoreProducer
+    +hltPFClusterSimClusterAssociationProducerHBHE
+    +hltPFClusterSimClusterAssociationProducerECAL
+    +hltPFCpAssocByEnergyScoreProducer
+    +hltPFClusterCaloParticleAssociationProducerHBHE
+    +hltPFClusterCaloParticleAssociationProducerECAL
     +hltPFTester
 )

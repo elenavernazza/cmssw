@@ -2,7 +2,7 @@ import FWCore.ParameterSet.Config as cms
 from DQMServices.Core.DQMEDHarvester import DQMEDHarvester
 
 hltPFClusterPostProcessor = DQMEDHarvester("DQMGenericClient",
-    subDirs=cms.untracked.vstring("HLT/ParticleFlow/PFClusterValidation"),
+    subDirs=cms.untracked.vstring("HLT/ParticleFlow/PFClusterValidation/*"),
     efficiency = cms.vstring(),
     #     "Eff_vs_EtaPt 'Efficiency vs #eta-p_{T}' MatchedGenEtaPt GenEtaPt",
     #     "Eff_vs_PhiPt 'Efficiency vs #phi-p_{T}' MatchedGenPhiPt GenPhiPt",

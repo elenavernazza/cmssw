@@ -68,10 +68,10 @@ phase2_common.toModify(
         #     cms.InputTag('g4SimHits', 'HGCHitsHEfront'),
         #     cms.InputTag('g4SimHits', 'HGCHitsHEback'),
         # ),
-        hcal = cms.VInputTag(cms.InputTag('g4SimHits', 'HcalHits')),
-        # ecal = cms.VInputTag(
-        #     cms.InputTag('g4SimHits', 'EcalHitsEB')
-        # )
+        # hcal = cms.VInputTag(cms.InputTag('g4SimHits', 'HcalHits')),
+        ecal = cms.VInputTag(
+            cms.InputTag('g4SimHits', 'EcalHitsEB')
+        )
     )
 )
 
