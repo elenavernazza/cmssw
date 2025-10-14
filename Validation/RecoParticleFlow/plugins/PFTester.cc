@@ -69,11 +69,11 @@ protected:
   MonitorElement* h_PFClusterHitDetId_;
 
   std::unordered_map<std::string, std::tuple<unsigned, float, float>> histoVars = {
-      {"Energy", std::make_tuple(150, 0., 75.)},
-      {"Pt", std::make_tuple(100, 0., 50.)},
+      {"Energy", std::make_tuple(100, 0., 50.)},
+      {"Pt", std::make_tuple(100, 0., 40.)},
       {"Eta", std::make_tuple(50, -6.5, 6.5)},
       {"Phi", std::make_tuple(50, -3.5, 3.5)},
-      {"Mult", std::make_tuple(100, 0., 200.)},
+      {"Mult", std::make_tuple(20, 0., 20.)},
   };
 
   using UMap = std::unordered_map<std::string, MonitorElement*>;
@@ -241,9 +241,10 @@ void PFTester::analyze(const edm::Event& iEvent, const edm::EventSetup&) {
   }
   auto recoToSimAssoc = *RecoToSimAssociatorHCALCollection;
   // std::cout << "recoSimColl size : " << recoToSimAssoc.size() << std::endl;
-
+  
   // efficiency computation
   for (unsigned int simId = 0; simId < simClusters.size(); ++simId) {
+	
     h_simClusters_["Energy"]->Fill(simClusters[simId].energy());
     h_simClusters_["Pt"]->Fill(simClusters[simId].pt());
     h_simClusters_["Eta"]->Fill(simClusters[simId].eta());
