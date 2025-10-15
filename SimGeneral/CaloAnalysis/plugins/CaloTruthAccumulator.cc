@@ -142,6 +142,7 @@ private:
   // geometry type (0 pre-TDR; 1 TDR)
   int geometryType_;
   bool doHGCAL;
+  std::string outputLabel_;
 };
 
 /* Graph utility functions */
@@ -245,11 +246,12 @@ CaloTruthAccumulator::CaloTruthAccumulator(const edm::ParameterSet &config,
       maxPseudoRapidity_(config.getParameter<double>("MaxPseudoRapidity")),
       premixStage1_(config.getParameter<bool>("premixStage1")),
       geometryType_(-1),
-      doHGCAL(config.getParameter<bool>("doHGCAL")) {
-  producesCollector.produces<SimClusterCollection>("MergedCaloTruth");
-  producesCollector.produces<CaloParticleCollection>("MergedCaloTruth");
+      doHGCAL(config.getParameter<bool>("doHGCAL")),
+      outputLabel_(config.getParameter<std::string>("outputLabel")) {
+  producesCollector.produces<SimClusterCollection>(outputLabel_);
+  producesCollector.produces<CaloParticleCollection>(outputLabel_);
   if (premixStage1_) {
-    producesCollector.produces<std::vector<std::pair<unsigned int, float>>>("MergedCaloTruth");
+    producesCollector.produces<std::vector<std::pair<unsigned int, float>>>(outputLabel_);
   }
 
   iC.consumes<std::vector<SimTrack>>(simTrackLabel_);

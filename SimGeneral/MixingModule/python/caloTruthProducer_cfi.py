@@ -6,10 +6,11 @@ caloParticles = cms.PSet(
 #	createMergedBremsstrahlung = cms.bool(True),
 #	createInitialVertexCollection = cms.bool(False),
 #	alwaysAddAncestors = cms.bool(True),
-        MinEnergy = cms.double(0.5),
-        MaxPseudoRapidity = cms.double(5.0),
-        premixStage1 = cms.bool(False),
-        doHGCAL = cms.bool(True),
+    MinEnergy = cms.double(0.5),
+    MaxPseudoRapidity = cms.double(5.0),
+    premixStage1 = cms.bool(False),
+    doHGCAL = cms.bool(True),
+    outputLabel = cms.string("MergedCaloTruth"),
 	maximumPreviousBunchCrossing = cms.uint32(0),
 	maximumSubsequentBunchCrossing = cms.uint32(0),
 	simHitCollections = cms.PSet(
@@ -30,6 +31,20 @@ caloParticles = cms.PSet(
 	genParticleCollection = cms.InputTag('genParticles'),
 	allowDifferentSimHitProcesses = cms.bool(False), # should be True for FastSim, False for FullSim
 	HepMCProductLabel = cms.InputTag('generatorSmeared'),
+)
+
+caloParticlesEcal = caloParticles.clone(
+    outputLabel = cms.string("EcalCaloTruth"),
+    simHitCollections = cms.PSet(
+        ecal = cms.VInputTag(cms.InputTag('g4SimHits','EcalHitsEB'))
+    )
+)
+
+caloParticlesHcal = caloParticles.clone(
+    outputLabel = cms.string("HcalCaloTruth"),
+    simHitCollections = cms.PSet(
+        hcal = cms.VInputTag(cms.InputTag('g4SimHits','HcalHits'))
+    )
 )
 
 from Configuration.ProcessModifiers.premix_stage1_cff import premix_stage1
@@ -59,16 +74,16 @@ run3_ecalclustering.toModify(
 from Configuration.Eras.Modifier_fastSim_cff import fastSim
 fastSim.toReplaceWith(caloParticles, cms.PSet()) # don't allow this to run in fastsim
 
-from Configuration.Eras.Modifier_phase2_common_cff import phase2_common
-phase2_common.toModify(
+from Configuration.ProcessModifiers.ticl_barrel_cff import ticl_barrel
+ticl_barrel.toModify(
     caloParticles, 
     simHitCollections = cms.PSet(
-        # hgc = cms.VInputTag(
-        #     cms.InputTag('g4SimHits', 'HGCHitsEE'),
-        #     cms.InputTag('g4SimHits', 'HGCHitsHEfront'),
-        #     cms.InputTag('g4SimHits', 'HGCHitsHEback'),
-        # ),
-        # hcal = cms.VInputTag(cms.InputTag('g4SimHits', 'HcalHits')),
+        hgc = cms.VInputTag(
+            cms.InputTag('g4SimHits', 'HGCHitsEE'),
+            cms.InputTag('g4SimHits', 'HGCHitsHEfront'),
+            cms.InputTag('g4SimHits', 'HGCHitsHEback'),
+        ),
+        hcal = cms.VInputTag(cms.InputTag('g4SimHits', 'HcalHits')),
         ecal = cms.VInputTag(
             cms.InputTag('g4SimHits', 'EcalHitsEB')
         )

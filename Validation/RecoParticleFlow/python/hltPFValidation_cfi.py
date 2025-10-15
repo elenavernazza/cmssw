@@ -12,13 +12,13 @@ hltPFScAssocByEnergyScoreProducer = cms.EDProducer("BarrelPCToSCAssociatorByEner
 hltPFClusterSimClusterAssociationProducerHBHE = cms.EDProducer("PCToSCAssociatorEDProducer",
     associator = cms.InputTag("hltPFScAssocByEnergyScoreProducer"),
     label_lcl = cms.InputTag("hltParticleFlowClusterHBHE"),
-    label_scl = cms.InputTag("mix","MergedCaloTruth") # FIXME: we will have different collections for ECAL and HCAL
+    label_scl = cms.InputTag("mix","HcalCaloTruth") 
 )
 
 hltPFClusterSimClusterAssociationProducerECAL = cms.EDProducer("PCToSCAssociatorEDProducer",
     associator = cms.InputTag("hltPFScAssocByEnergyScoreProducer"),
-    label_lcl = cms.InputTag("hltParticleFlowRecHitECALUnseeded"),
-    label_scl = cms.InputTag("mix","MergedCaloTruth") # FIXME: we will have different collections for ECAL and HCAL
+    label_lcl = cms.InputTag("hltParticleFlowClusterECALUnseeded"),
+    label_scl = cms.InputTag("mix","EcalCaloTruth") 
 )
 
 hltPFCpAssocByEnergyScoreProducer = cms.EDProducer("BarrelPCToCPAssociatorByEnergyScoreProducer",
@@ -30,23 +30,23 @@ hltPFCpAssocByEnergyScoreProducer = cms.EDProducer("BarrelPCToCPAssociatorByEner
 hltPFClusterCaloParticleAssociationProducerHBHE = cms.EDProducer("PCToCPAssociatorEDProducer",
     associator = cms.InputTag("hltPFCpAssocByEnergyScoreProducer"),
     label_lc = cms.InputTag("hltParticleFlowClusterHBHE"),
-    label_cp = cms.InputTag("mix","MergedCaloTruth") # FIXME: we will have different collections for ECAL and HCAL
+    label_cp = cms.InputTag("mix","HcalCaloTruth") 
 )
 
 hltPFClusterCaloParticleAssociationProducerECAL = cms.EDProducer("PCToCPAssociatorEDProducer",
     associator = cms.InputTag("hltPFCpAssocByEnergyScoreProducer"),
-    label_lc = cms.InputTag("hltParticleFlowRecHitECALUnseeded"),
-    label_cp = cms.InputTag("mix","MergedCaloTruth") # FIXME: we will have different collections for ECAL and HCAL
+    label_lc = cms.InputTag("hltParticleFlowClusterECALUnseeded"),
+    label_cp = cms.InputTag("mix","EcalCaloTruth") 
 )
 
 hltPFTester = cms.EDProducer("PFTester",
     PFCand = cms.InputTag("hltParticleFlowTmp"),
     PFClusterHCAL = cms.InputTag("hltParticleFlowClusterHBHE"),
-    SimClusterHCAL = cms.InputTag("mix","MergedCaloTruth"), # FIXME: we will have different collections for ECAL and HCAL
+    SimClusterHCAL = cms.InputTag("mix","HcalCaloTruth"), 
     PFClusterSimClusterAssociatorHCAL = cms.InputTag("hltPFClusterSimClusterAssociationProducerHBHE"),
     PFClusterCaloParticleAssociatorHCAL = cms.InputTag("hltPFClusterCaloParticleAssociationProducerHBHE"),
     PFClusterECAL = cms.InputTag("hltParticleFlowClusterECALUnseeded"),
-    SimClusterECAL = cms.InputTag("mix","MergedCaloTruth"), # FIXME: we will have different collections for ECAL and HCAL
+    SimClusterECAL = cms.InputTag("mix","EcalCaloTruth"), 
     PFClusterSimClusterAssociatorECAL = cms.InputTag("hltPFClusterSimClusterAssociationProducerECAL"),
     PFClusterCaloParticleAssociatorECAL = cms.InputTag("hltPFClusterCaloParticleAssociationProducerECAL"),
 )
