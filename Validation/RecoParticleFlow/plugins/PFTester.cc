@@ -69,7 +69,7 @@ protected:
   MonitorElement* h_PFClusterHitDetId_;
 
   double assocScoreThreshold_;
-  
+
   std::unordered_map<std::string, std::tuple<unsigned, float, float>> histoVars = {
       {"Energy", std::make_tuple(100, 0., 50.)},
       {"Pt", std::make_tuple(100, 0., 40.)},
@@ -81,6 +81,7 @@ protected:
   using UMap = std::unordered_map<std::string, MonitorElement*>;
   UMap h_simClusters_;
   UMap h_simClustersMatchedRecoClusters_;
+  UMap h_simClustersMultiMatchedRecoClusters_;
   UMap h_recoClusters_;
   UMap h_recoClustersMatchedSimClusters_;
   UMap h_recoClustersMultiMatchedSimClusters_;
@@ -97,8 +98,8 @@ PFTester::PFTester(const edm::ParameterSet& iConfig)
       RecoToCpAssociatorHCALToken_(consumes<ticl::RecoToSimCollectionT<reco::PFClusterCollection>>(
           iConfig.getParameter<edm::InputTag>("PFClusterCaloParticleAssociatorHCAL"))),
       CpToRecoAssociatorHCALToken_(consumes<ticl::SimToRecoCollectionT<reco::PFClusterCollection>>(
-																								   iConfig.getParameter<edm::InputTag>("PFClusterCaloParticleAssociatorHCAL"))),
-	  assocScoreThreshold_(iConfig.getParameter<double>("assocScoreThreshold")) {}
+          iConfig.getParameter<edm::InputTag>("PFClusterCaloParticleAssociatorHCAL"))),
+      assocScoreThreshold_(iConfig.getParameter<double>("assocScoreThreshold")) {}
 
 void PFTester::bookHistograms(DQMStore::IBooker& ibook, edm::Run const&, edm::EventSetup const&) {
   ibook.setCurrentFolder("HLT/ParticleFlow/PFCandidates");
@@ -141,26 +142,33 @@ void PFTester::bookHistograms(DQMStore::IBooker& ibook, edm::Run const&, edm::Ev
   for (auto& hVar : histoVars) {
     auto [nBins, hMin, hMax] = hVar.second;
     h_simClusters_[hVar.first] =
-	  ibook.book1D("SimClusters" + hVar.first, "SimClusters;" + hVar.first, nBins, hMin, hMax);
+        ibook.book1D("SimClusters" + hVar.first, "SimClusters;" + hVar.first, nBins, hMin, hMax);
     h_simClustersMatchedRecoClusters_[hVar.first] = ibook.book1D("SimClustersMatchedRecoClusters" + hVar.first,
                                                                  "SimClusters matched to RecoClusters;" + hVar.first,
                                                                  nBins,
                                                                  hMin,
                                                                  hMax);
+    h_simClustersMultiMatchedRecoClusters_[hVar.first] =
+        ibook.book1D("SimClustersMultiMatchedRecoClusters" + hVar.first,
+                     "SimClusters multi-matched to RecoClusters;" + hVar.first,
+                     nBins,
+                     hMin,
+                     hMax);
+
     h_recoClusters_[hVar.first] =
-	  ibook.book1D("RecoClusters" + hVar.first, "RecoClusters;" + hVar.first, nBins, hMin, hMax);
+        ibook.book1D("RecoClusters" + hVar.first, "RecoClusters;" + hVar.first, nBins, hMin, hMax);
 
     h_recoClustersMatchedSimClusters_[hVar.first] = ibook.book1D("RecoClustersMatchedSimClusters" + hVar.first,
                                                                  "RecoClusters matched to SimClusters;" + hVar.first,
                                                                  nBins,
                                                                  hMin,
                                                                  hMax);
-	h_recoClustersMultiMatchedSimClusters_[hVar.first] = ibook.book1D("RecoClustersMultiMatchedSimClusters" + hVar.first,
-																	  "RecoClusters multi-matched to SimClusters;" + hVar.first,
-																	  nBins,
-																	  hMin,
-																	  hMax);
-
+    h_recoClustersMultiMatchedSimClusters_[hVar.first] =
+        ibook.book1D("RecoClustersMultiMatchedSimClusters" + hVar.first,
+                     "RecoClusters multi-matched to SimClusters;" + hVar.first,
+                     nBins,
+                     hMin,
+                     hMax);
   }
 }
 
@@ -219,11 +227,11 @@ void PFTester::analyze(const edm::Event& iEvent, const edm::EventSetup&) {
     return;
   }
   auto recoToSimAssoc = *RecoToSimAssociatorHCALCollection;
-  // std::cout << "recoSimColl size : " << recoToSimAssoc.size() << std::endl;
-  
+
+  std::vector<unsigned> recoIdsMerged;
+
   // efficiency and merge rate computation
   for (unsigned int simId = 0; simId < simClusters.size(); ++simId) {
-	
     h_simClusters_["Energy"]->Fill(simClusters[simId].energy());
     h_simClusters_["Pt"]->Fill(simClusters[simId].pt());
     h_simClusters_["Eta"]->Fill(simClusters[simId].eta());
@@ -235,26 +243,65 @@ void PFTester::analyze(const edm::Event& iEvent, const edm::EventSetup&) {
     if (simToRecoIt == simToRecoAssoc.end())
       continue;
     const auto& simToRecoMatched = simToRecoIt->val;
-
     if (simToRecoMatched.empty())
       continue;
 
-    h_simClustersMatchedRecoClusters_["Energy"]->Fill(simClusters[simId].energy());
-    h_simClustersMatchedRecoClusters_["Pt"]->Fill(simClusters[simId].pt());
-    h_simClustersMatchedRecoClusters_["Eta"]->Fill(simClusters[simId].eta());
-    h_simClustersMatchedRecoClusters_["Phi"]->Fill(simClusters[simId].phi());
-    h_simClustersMatchedRecoClusters_["Mult"]->Fill(simClusters[simId].numberOfSimHits());
+    bool wasNotFilled = true;
+    for (const auto& recoPair : simToRecoMatched) {
+      const auto recoPairIdx = recoPair.first.index();
 
-    // for (const auto& recoPair : simToRecoMatched) {
-    //   std::cout << " simToRecoAssoc simCluster id " << simId << " : matched recoCluster id = " << recoPair.first.index()
-    // 			<< " shared energy = " << recoPair.second.first
-    // 			<< " score = " << recoPair.second.second << std::endl;
-    // }
+      if (recoPair.second.second < assocScoreThreshold_)
+        continue;
+
+      // numerator histograms must be filled only once per sim cluster
+      if (wasNotFilled) {
+        wasNotFilled = true;
+        h_simClustersMatchedRecoClusters_["Energy"]->Fill(simClusters[simId].energy());
+        h_simClustersMatchedRecoClusters_["Pt"]->Fill(simClusters[simId].pt());
+        h_simClustersMatchedRecoClusters_["Eta"]->Fill(simClusters[simId].eta());
+        h_simClustersMatchedRecoClusters_["Phi"]->Fill(simClusters[simId].phi());
+        h_simClustersMatchedRecoClusters_["Mult"]->Fill(simClusters[simId].numberOfSimHits());
+      }
+
+      // discard reco clusters from merge counting if already considered for a previous sim cluster
+      const auto& mergeIt = std::find(recoIdsMerged.begin(), recoIdsMerged.end(), recoPairIdx);
+      if (mergeIt != recoIdsMerged.end())
+        continue;
+      recoIdsMerged.push_back(recoPairIdx);
+
+      const edm::Ref<reco::PFClusterCollection> recoClusterRef(PFClusterHCAL, recoPairIdx);
+      const auto& recoToSimIt = recoToSimAssoc.find(recoClusterRef);
+      assert(recoToSimIt != recoToSimAssoc.end());
+      const auto& recoToSimMatched = recoToSimIt->val;
+      assert(!recoToSimMatched.empty());
+
+      // find how many reco clusters are associated to the matched sim cluster
+      unsigned nSimMerged = 0;
+      for (const auto& simPair : recoToSimMatched) {
+        if (simPair.second < assocScoreThreshold_)
+          continue;
+        ++nSimMerged;
+      }
+
+      if (nSimMerged > 1) {
+        h_simClustersMultiMatchedRecoClusters_["Energy"]->Fill(recoClusters[simId].energy());
+        h_simClustersMultiMatchedRecoClusters_["Pt"]->Fill(recoClusters[simId].pt());
+        h_simClustersMultiMatchedRecoClusters_["Eta"]->Fill(recoClusters[simId].eta());
+        h_simClustersMultiMatchedRecoClusters_["Phi"]->Fill(recoClusters[simId].phi());
+        h_simClustersMultiMatchedRecoClusters_["Mult"]->Fill(recoClusters[simId].size());
+      }
+
+      // for (const auto& recoPair : simToRecoMatched) {
+      //   std::cout << " simToRecoAssoc simCluster id " << simId << " : matched recoCluster id = " << recoPair.first.index()
+      // 			<< " shared energy = " << recoPair.second.first
+      // 			<< " score = " << recoPair.second.second << std::endl;
+      // }
+    }
   }
 
   std::vector<unsigned> simIdsDuplicates;
-  
-  // fake rate and duplicate computation										   
+
+  // fake rate and duplicate computation
   for (unsigned int recoId = 0; recoId < recoClusters.size(); ++recoId) {
     h_recoClusters_["Energy"]->Fill(recoClusters[recoId].energy());
     h_recoClusters_["Pt"]->Fill(recoClusters[recoId].pt());
@@ -267,62 +314,56 @@ void PFTester::analyze(const edm::Event& iEvent, const edm::EventSetup&) {
     if (recoToSimIt == recoToSimAssoc.end())
       continue;
     const auto& recoToSimMatched = recoToSimIt->val;
-
     if (recoToSimMatched.empty())
       continue;
 
-	
-	bool wasNotFilled = true;
+    bool wasNotFilled = true;
     for (const auto& simPair : recoToSimMatched) {
-	  const auto simPairIdx = simPair.first.index();
+      const auto simPairIdx = simPair.first.index();
       // std::cout << " recoToSimAssoc recoCluster id " << recoId << " : matched simCluster id = " << simPairIdx
       // 			<< " score = " << simPair.second << std::endl;
 
-	  if ( simPair.second < assocScoreThreshold_ )
-		continue;
+      if (simPair.second < assocScoreThreshold_)
+        continue;
 
-	  // numerator histograms must be filled only once per reco cluster
-	  if (wasNotFilled) {
-		wasNotFilled = true;
-		h_recoClustersMatchedSimClusters_["Energy"]->Fill(recoClusters[recoId].energy());
-		h_recoClustersMatchedSimClusters_["Pt"]->Fill(recoClusters[recoId].pt());
-		h_recoClustersMatchedSimClusters_["Eta"]->Fill(recoClusters[recoId].eta());
-		h_recoClustersMatchedSimClusters_["Phi"]->Fill(recoClusters[recoId].phi());
-		h_recoClustersMatchedSimClusters_["Mult"]->Fill(recoClusters[recoId].size());
-	  }
+      // numerator histograms must be filled only once per reco cluster
+      if (wasNotFilled) {
+        wasNotFilled = true;
+        h_recoClustersMatchedSimClusters_["Energy"]->Fill(recoClusters[recoId].energy());
+        h_recoClustersMatchedSimClusters_["Pt"]->Fill(recoClusters[recoId].pt());
+        h_recoClustersMatchedSimClusters_["Eta"]->Fill(recoClusters[recoId].eta());
+        h_recoClustersMatchedSimClusters_["Phi"]->Fill(recoClusters[recoId].phi());
+        h_recoClustersMatchedSimClusters_["Mult"]->Fill(recoClusters[recoId].size());
+      }
 
-	  // discard sim clusters from duplicate counting if already considered for a previous reco cluster
-	  const auto& dupIt = std::find(simIdsDuplicates.begin(), simIdsDuplicates.end(), simPairIdx);
-	  if (dupIt != simIdsDuplicates.end())
-		continue;
-	  simIdsDuplicates.push_back(simPairIdx);
-	  
-	  const edm::Ref<SimClusterCollection> simClusterRef(SimClusterHCAL, simPairIdx);
-	  const auto& simToRecoIt = simToRecoAssoc.find(simClusterRef);
-	  assert(simToRecoIt != simToRecoAssoc.end());
-	  const auto& simToRecoMatched = simToRecoIt->val;
-	  assert(!simToRecoMatched.empty());
+      // discard sim clusters from duplicate counting if already considered for a previous reco cluster
+      const auto& dupIt = std::find(simIdsDuplicates.begin(), simIdsDuplicates.end(), simPairIdx);
+      if (dupIt != simIdsDuplicates.end())
+        continue;
+      simIdsDuplicates.push_back(simPairIdx);
 
-	  // find how many reco clusters are associated to the matched sim cluster
-	  unsigned nRecoDuplicates = 0;
-	  for (const auto& recoPair : simToRecoMatched) {
-		if ( recoPair.second.second < assocScoreThreshold_ )
-		  continue;
-		++nRecoDuplicates;
-	  }
+      const edm::Ref<SimClusterCollection> simClusterRef(SimClusterHCAL, simPairIdx);
+      const auto& simToRecoIt = simToRecoAssoc.find(simClusterRef);
+      assert(simToRecoIt != simToRecoAssoc.end());
+      const auto& simToRecoMatched = simToRecoIt->val;
+      assert(!simToRecoMatched.empty());
 
-	  if(nRecoDuplicates > 1) {
-		h_recoClustersMultiMatchedSimClusters_["Energy"]->Fill(recoClusters[recoId].energy());
-		h_recoClustersMultiMatchedSimClusters_["Pt"]->Fill(recoClusters[recoId].pt());
-		h_recoClustersMultiMatchedSimClusters_["Eta"]->Fill(recoClusters[recoId].eta());
-		h_recoClustersMultiMatchedSimClusters_["Phi"]->Fill(recoClusters[recoId].phi());
-		h_recoClustersMultiMatchedSimClusters_["Mult"]->Fill(recoClusters[recoId].size());
-	  }
-		
+      // find how many reco clusters are associated to the matched sim cluster
+      unsigned nRecoDuplicates = 0;
+      for (const auto& recoPair : simToRecoMatched) {
+        if (recoPair.second.second < assocScoreThreshold_)
+          continue;
+        ++nRecoDuplicates;
+      }
 
-	   
-	}
-
+      if (nRecoDuplicates > 1) {
+        h_recoClustersMultiMatchedSimClusters_["Energy"]->Fill(recoClusters[recoId].energy());
+        h_recoClustersMultiMatchedSimClusters_["Pt"]->Fill(recoClusters[recoId].pt());
+        h_recoClustersMultiMatchedSimClusters_["Eta"]->Fill(recoClusters[recoId].eta());
+        h_recoClustersMultiMatchedSimClusters_["Phi"]->Fill(recoClusters[recoId].phi());
+        h_recoClustersMultiMatchedSimClusters_["Mult"]->Fill(recoClusters[recoId].size());
+      }
+    }
   }
 
   // --------------------------------------------------------------------

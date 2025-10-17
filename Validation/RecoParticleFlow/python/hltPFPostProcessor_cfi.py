@@ -1,7 +1,8 @@
 import FWCore.ParameterSet.Config as cms
 from DQMServices.Core.DQMEDHarvester import DQMEDHarvester
 
-hltPFClusterPostProcessor = DQMEDHarvester("DQMGenericClient",
+hltPFClusterPostProcessor = DQMEDHarvester(
+    "DQMGenericClient",
     subDirs=cms.untracked.vstring("HLT/ParticleFlow/PFClusterValidation"),
     efficiency = cms.vstring(
         "Eff_vs_EnergyEta 'Efficiency vs Energy-#eta' SimClustersMatchedRecoClustersEnergy_Eta SimClustersEnergy_Eta",
@@ -40,6 +41,12 @@ hltPFClusterPostProcessor = DQMEDHarvester("DQMGenericClient",
         "Dup_vs_Eta 'Dup Rate vs #eta' RecoClustersMultiMatchedSimClustersEta RecoClustersEta ",
         "Dup_vs_Phi 'Dup Rate vs #phi' RecoClustersMultiMatchedSimClustersPhi RecoClustersPhi ",
         "Dup_vs_Mult 'Dup Rate vs Mult' RecoClustersMultiMatchedSimClustersMult RecoClustersMult ",
+        # Merge rate
+        "Merge_vs_Energy 'Merge Rate vs Energy' SimClustersMultiMatchedRecoClustersEnergy SimClustersEnergy ",
+        "Merge_vs_Pt 'Merge Rate vs p_{T}' SimClustersMultiMatchedRecoClustersPt SimClustersPt ",
+        "Merge_vs_Eta 'Merge Rate vs #eta' SimClustersMultiMatchedRecoClustersEta SimClustersEta ",
+        "Merge_vs_Phi 'Merge Rate vs #phi' SimClustersMultiMatchedRecoClustersPhi SimClustersPhi ",
+        "Merge_vs_Mult 'Merge Rate vs Multiplicity' SimClustersMultiMatchedRecoClustersMult SimClustersMult ",
     ),
     resolution = cms.vstring(),
     verbose = cms.untracked.uint32(2), 
