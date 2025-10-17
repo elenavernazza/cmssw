@@ -255,7 +255,7 @@ void PFTester::analyze(const edm::Event& iEvent, const edm::EventSetup&) {
 
       // numerator histograms must be filled only once per sim cluster
       if (wasNotFilled) {
-        wasNotFilled = true;
+        wasNotFilled = false;
         h_simClustersMatchedRecoClusters_["Energy"]->Fill(simClusters[simId].energy());
         h_simClustersMatchedRecoClusters_["Pt"]->Fill(simClusters[simId].pt());
         h_simClustersMatchedRecoClusters_["Eta"]->Fill(simClusters[simId].eta());
@@ -328,7 +328,7 @@ void PFTester::analyze(const edm::Event& iEvent, const edm::EventSetup&) {
 
       // numerator histograms must be filled only once per reco cluster
       if (wasNotFilled) {
-        wasNotFilled = true;
+        wasNotFilled = false;
         h_recoClustersMatchedSimClusters_["Energy"]->Fill(recoClusters[recoId].energy());
         h_recoClustersMatchedSimClusters_["Pt"]->Fill(recoClusters[recoId].pt());
         h_recoClustersMatchedSimClusters_["Eta"]->Fill(recoClusters[recoId].eta());
