@@ -8,22 +8,28 @@ hltPFClusterPostProcessor = DQMEDHarvester(
     "DQMGenericClient",
     subDirs=cms.untracked.vstring("HLT/ParticleFlow/PFClusterValidation"),
     efficiency = cms.vstring(
-        "Eff_vs_EnergyEta 'Efficiency vs Energy-#eta' SimClustersMatchedRecoClustersEn_Eta SimClustersEn_Eta",
-        "Eff_vs_EnergyPhi 'Efficiency vs Energy-#phi' SimClustersMatchedRecoClustersEn_Phi SimClustersEn_Phi",
-        "Eff_vs_EnergyMult 'Efficiency vs Energy-Mult' SimClustersMatchedRecoClustersEn_Mult SimClustersEn_Mult",
-        "Eff_vs_PtEta 'Efficiency vs p_{T}-#eta' SimClustersMatchedRecoClustersPt_Eta SimClustersPt_Eta",
-        "Eff_vs_PtPhi 'Efficiency vs p_{T}-#phi' SimClustersMatchedRecoClustersPt_Phi SimClustersPt_Phi",
-        "Eff_vs_PtMult 'Efficiency vs p_{T}-Mult' SimClustersMatchedRecoClustersPt_Mult SimClustersPt_Mult",
-        "Eff_vs_MultEta 'Efficiency vs Mult-#eta' SimClustersMatchedRecoClustersMult_Eta SimClustersMult_Eta",
-        "Eff_vs_MultPhi 'Efficiency vs Mult-#phi' SimClustersMatchedRecoClustersMult_Phi SimClustersMult_Phi",
-        "Fake_vs_EnergyEta 'Fake Rate vs Energy-#eta' RecoClustersMatchedSimClustersEn_Eta RecoClustersPt_Eta fake",
-        "Fake_vs_EnergyPhi 'Fake Rate vs Energy-#phi' RecoClustersMatchedSimClustersEn_Phi RecoClustersPt_Phi fake",
-        "Fake_vs_EnergyMult 'Fake Rate vs Energy-Mult' RecoClustersMatchedSimClustersEn_Mult RecoClustersPt_Mult fake",
-        "Fake_vs_PtEta 'Fake Rate vs p_{T}-#eta' RecoClustersMatchedSimClustersPt_Eta RecoClustersPt_Eta fake",
-        "Fake_vs_PtPhi 'Fake Rate vs p_{T}-#phi' RecoClustersMatchedSimClustersPt_Phi RecoClustersPt_Phi fake",
-        "Fake_vs_PtMult 'Fake Rate vs p_{T}-Mult' RecoClustersMatchedSimClustersPt_Mult RecoClustersPt_Mult fake",
-        "Fake_vs_MultEta 'Fake Rate vs Mult-#eta' RecoClustersMatchedSimClustersMult_Eta RecoClustersMult_Eta fake",
-        "Fake_vs_MultPhi 'Fake Rate vs Mult-#phi' RecoClustersMatchedSimClustersMult_Phi RecoClustersMult_Phi fake",
+        *[ item
+           for thr in _thresholds
+           for recble in ('', 'Reconstructable')
+           for item in (
+                   f"'Score{thr}/Eff_vs_EnergyEta {recble}' 'Efficiency vs Energy-#eta {recble}' Score{thr}/SimClustersMatchedRecoClustersEn_Eta_Score{thr} SimClusters{recble}En_Eta",
+                   f"'Score{thr}/Eff_vs_EnergyPhi {recble}' 'Efficiency vs Energy-#phi {recble}' Score{thr}/SimClustersMatchedRecoClustersEn_Phi_Score{thr} SimClusters{recble}En_Phi",
+                   f"'Score{thr}/Eff_vs_EnergyMult {recble}' 'Efficiency vs Energy-Mult {recble}' Score{thr}/SimClustersMatchedRecoClustersEn_Mult_Score{thr} SimClusters{recble}En_Mult",
+                   f"'Score{thr}/Eff_vs_PtEta {recble}' 'Efficiency vs p_{{T}}-#eta {recble}' Score{thr}/SimClustersMatchedRecoClustersPt_Eta_Score{thr} SimClusters{recble}Pt_Eta",
+                   f"'Score{thr}/Eff_vs_PtPhi {recble}' 'Efficiency vs p_{{T}}-#phi {recble}' Score{thr}/SimClustersMatchedRecoClustersPt_Phi_Score{thr} SimClusters{recble}Pt_Phi",
+                   f"'Score{thr}/Eff_vs_PtMult {recble}' 'Efficiency vs p_{{T}}-Mult {recble}' Score{thr}/SimClustersMatchedRecoClustersPt_Mult_Score{thr} SimClusters{recble}Pt_Mult",
+                   f"'Score{thr}/Eff_vs_MultEta {recble}' 'Efficiency vs Mult-#eta {recble}' Score{thr}/SimClustersMatchedRecoClustersMult_Eta_Score{thr} SimClusters{recble}Mult_Eta",
+                   f"'Score{thr}/Eff_vs_MultPhi {recble}' 'Efficiency vs Mult-#phi {recble}' Score{thr}/SimClustersMatchedRecoClustersMult_Phi_Score{thr} SimClusters{recble}Mult_Phi",
+                   f"'Score{thr}/Fake_vs_EnergyEta {recble}' 'Fake Rate vs Energy-#eta {recble}' Score{thr}/RecoClustersMatchedSimClustersEn_Eta_Score{thr} RecoClusters{recble}Pt_Eta fake",
+                   f"'Score{thr}/Fake_vs_EnergyPhi {recble}' 'Fake Rate vs Energy-#phi {recble}' Score{thr}/RecoClustersMatchedSimClustersEn_Phi_Score{thr} RecoClusters{recble}Pt_Phi fake",
+                   f"'Score{thr}/Fake_vs_EnergyMult {recble}' 'Fake Rate vs Energy-Mult {recble}' Score{thr}/RecoClustersMatchedSimClustersEn_Mult_Score{thr} RecoClusters{recble}Pt_Mult fake",
+                   f"'Score{thr}/Fake_vs_PtEta {recble}' 'Fake Rate vs p_{{T}}-#eta {recble}' Score{thr}/RecoClustersMatchedSimClustersPt_Eta_Score{thr} RecoClusters{recble}Pt_Eta fake",
+                   f"'Score{thr}/Fake_vs_PtPhi {recble}' 'Fake Rate vs p_{{T}}-#phi {recble}' Score{thr}/RecoClustersMatchedSimClustersPt_Phi_Score{thr} RecoClusters{recble}Pt_Phi fake",
+                   f"'Score{thr}/Fake_vs_PtMult {recble}' 'Fake Rate vs p_{{T}}-Mult {recble}' Score{thr}/RecoClustersMatchedSimClustersPt_Mult_Score{thr} RecoClusters{recble}Pt_Mult fake",
+                   f"'Score{thr}/Fake_vs_MultEta {recble}' 'Fake Rate vs Mult-#eta {recble}' Score{thr}/RecoClustersMatchedSimClustersMult_Eta_Score{thr} RecoClusters{recble}Mult_Eta fake",
+                   f"'Score{thr}/Fake_vs_MultPhi {recble}' 'Fake Rate vs Mult-#phi {recble}' Score{thr}/RecoClustersMatchedSimClustersMult_Phi_Score{thr} RecoClusters{recble}Mult_Phi fake",
+           )
+          ],
     ),
     efficiencyProfile = cms.untracked.vstring( # for smoother rebinning
         *[ item
