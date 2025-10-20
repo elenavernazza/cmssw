@@ -259,7 +259,7 @@ void PFTester::analyze(const edm::Event& iEvent, const edm::EventSetup&) {
 	  for (unsigned ithr=0; ithr<assocScoreThresholds_.size(); ++ithr) {
 		const double& thresh = assocScoreThresholds_[ithr];
 
-		if (recoPair.second.second < thresh)
+		if (recoPair.second.second > thresh)
 		  continue;
 
 		// numerator histograms must be filled only once per sim cluster
@@ -287,7 +287,7 @@ void PFTester::analyze(const edm::Event& iEvent, const edm::EventSetup&) {
 		// find how many reco clusters are associated to the matched sim cluster
 		unsigned nSimMerged = 0;
 		for (const auto& simPair : recoToSimMatched) {
-		  if (simPair.second < thresh)
+		  if (simPair.second > thresh)
 			continue;
 		  ++nSimMerged;
 		}
@@ -336,7 +336,7 @@ void PFTester::analyze(const edm::Event& iEvent, const edm::EventSetup&) {
 	  for (unsigned ithr=0; ithr<assocScoreThresholds_.size(); ++ithr) {
 		const double& thresh = assocScoreThresholds_[ithr];
 		
-		if (simPair.second < thresh)
+		if (simPair.second > thresh)
 		  continue;
 
 		// numerator histograms must be filled only once per reco cluster
@@ -364,7 +364,7 @@ void PFTester::analyze(const edm::Event& iEvent, const edm::EventSetup&) {
 		// find how many reco clusters are associated to the matched sim cluster
 		unsigned nRecoDuplicates = 0;
 		for (const auto& recoPair : simToRecoMatched) {
-		  if (recoPair.second.second < thresh)
+		  if (recoPair.second.second > thresh)
 			continue;
 		  ++nRecoDuplicates;
 		}
