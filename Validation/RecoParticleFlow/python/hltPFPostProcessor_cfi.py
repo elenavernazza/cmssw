@@ -28,31 +28,32 @@ hltPFClusterPostProcessor = DQMEDHarvester(
     efficiencyProfile = cms.untracked.vstring( # for smoother rebinning
         *[ item
            for thr in _thresholds
+           for recble in ('', 'Reconstructable')
            for item in (
                    # Efficiency
-                   f"Score{thr}/Eff_vs_Energy 'Efficiency vs Energy' Score{thr}/SimClustersMatchedRecoClustersEn_Score{thr} SimClustersEn",
-                   f"Score{thr}/Eff_vs_Pt 'Efficiency vs p_{{T}}' Score{thr}/SimClustersMatchedRecoClustersPt_Score{thr} SimClustersPt",
-                   f"Score{thr}/Eff_vs_Eta 'Efficiency vs #eta' Score{thr}/SimClustersMatchedRecoClustersEta_Score{thr} SimClustersEta",
-                   f"Score{thr}/Eff_vs_Phi 'Efficiency vs #phi' Score{thr}/SimClustersMatchedRecoClustersPhi_Score{thr} SimClustersPhi",
-                   f"Score{thr}/Eff_vs_Mult 'Efficiency vs Multiplicity' Score{thr}/SimClustersMatchedRecoClustersMult_Score{thr} SimClustersMult"    
+                   f"'Score{thr}/Eff_vs_Energy {recble}' 'Efficiency vs Energy {recble}' Score{thr}/SimClustersMatchedRecoClustersEn_Score{thr} SimClusters{recble}En",
+                   f"'Score{thr}/Eff_vs_Pt {recble}' 'Efficiency vs p_{{T}} {recble}' Score{thr}/SimClustersMatchedRecoClustersPt_Score{thr} SimClusters{recble}Pt",
+                   f"'Score{thr}/Eff_vs_Eta {recble}' 'Efficiency vs #eta {recble}' Score{thr}/SimClustersMatchedRecoClustersEta_Score{thr} SimClusters{recble}Eta",
+                   f"'Score{thr}/Eff_vs_Phi {recble}' 'Efficiency vs #phi {recble}' Score{thr}/SimClustersMatchedRecoClustersPhi_Score{thr} SimClusters{recble}Phi",
+                   f"'Score{thr}/Eff_vs_Mult {recble}' 'Efficiency vs Multiplicity {recble}' Score{thr}/SimClustersMatchedRecoClustersMult_Score{thr} SimClusters{recble}Mult"    
                    # Fake rate
-                   f"Score{thr}/Fake_vs_En 'Fake Rate vs Energy' Score{thr}/RecoClustersMatchedSimClustersEn_Score{thr} RecoClustersEn",
-                   f"Score{thr}/Fake_vs_Pt 'Fake Rate vs p_{{T}}' Score{thr}/RecoClustersMatchedSimClustersPt_Score{thr} RecoClustersPt",
-                   f"Score{thr}/Fake_vs_Eta 'Fake Rate vs #eta' Score{thr}/RecoClustersMatchedSimClustersEta_Score{thr} RecoClustersEta",
-                   f"Score{thr}/Fake_vs_Phi 'Fake Rate vs #phi' Score{thr}/RecoClustersMatchedSimClustersPhi_Score{thr} RecoClustersPhi",
-                   f"Score{thr}/Fake_vs_Mult 'Fake Rate vs Multiplicity' Score{thr}/RecoClustersMatchedSimClustersMult_Score{thr} RecoClustersMult",
+                   f"'Score{thr}/Fake_vs_En {recble}' 'Fake Rate vs Energy {recble}' Score{thr}/RecoClustersMatchedSimClustersEn_Score{thr} RecoClusters{recble}En",
+                   f"'Score{thr}/Fake_vs_Pt {recble}' 'Fake Rate vs p_{{T}} {recble}' Score{thr}/RecoClustersMatchedSimClustersPt_Score{thr} RecoClusters{recble}Pt",
+                   f"'Score{thr}/Fake_vs_Eta {recble}' 'Fake Rate vs #eta {recble}' Score{thr}/RecoClustersMatchedSimClustersEta_Score{thr} RecoClusters{recble}Eta",
+                   f"'Score{thr}/Fake_vs_Phi {recble}' 'Fake Rate vs #phi {recble}' Score{thr}/RecoClustersMatchedSimClustersPhi_Score{thr} RecoClusters{recble}Phi",
+                   f"'Score{thr}/Fake_vs_Mult {recble}' 'Fake Rate vs Multiplicity {recble}' Score{thr}/RecoClustersMatchedSimClustersMult_Score{thr} RecoClusters{recble}Mult",
                    # Duplicate rate
-                   f"Score{thr}/Dup_vs_En 'Dup Rate vs Energy' Score{thr}/RecoClustersMultiMatchedSimClustersEn_Score{thr} RecoClustersEn",
-                   f"Score{thr}/Dup_vs_Pt 'Dup Rate vs p_{{T}}' Score{thr}/RecoClustersMultiMatchedSimClustersPt_Score{thr} RecoClustersPt",
-                   f"Score{thr}/Dup_vs_Eta 'Dup Rate vs #eta' Score{thr}/RecoClustersMultiMatchedSimClustersEta_Score{thr} RecoClustersEta",
-                   f"Score{thr}/Dup_vs_Phi 'Dup Rate vs #phi' Score{thr}/RecoClustersMultiMatchedSimClustersPhi_Score{thr} RecoClustersPhi",
-                   f"Score{thr}/Dup_vs_Mult 'Dup Rate vs Mult' Score{thr}/RecoClustersMultiMatchedSimClustersMult_Score{thr} RecoClustersMult",
+                   f"'Score{thr}/Dup_vs_En {recble}' 'Dup Rate vs Energy {recble}' Score{thr}/RecoClustersMultiMatchedSimClustersEn_Score{thr} RecoClusters{recble}En",
+                   f"'Score{thr}/Dup_vs_Pt {recble}' 'Dup Rate vs p_{{T}} {recble}' Score{thr}/RecoClustersMultiMatchedSimClustersPt_Score{thr} RecoClusters{recble}Pt",
+                   f"'Score{thr}/Dup_vs_Eta {recble}' 'Dup Rate vs #eta {recble}' Score{thr}/RecoClustersMultiMatchedSimClustersEta_Score{thr} RecoClusters{recble}Eta",
+                   f"'Score{thr}/Dup_vs_Phi {recble}' 'Dup Rate vs #phi {recble}' Score{thr}/RecoClustersMultiMatchedSimClustersPhi_Score{thr} RecoClusters{recble}Phi",
+                   f"'Score{thr}/Dup_vs_Mult {recble}' 'Dup Rate vs Mult {recble}' Score{thr}/RecoClustersMultiMatchedSimClustersMult_Score{thr} RecoClusters{recble}Mult",
                    # Merge rate
-                   f"Score{thr}/Merge_vs_En 'Merge Rate vs Energy' Score{thr}/SimClustersMultiMatchedRecoClustersEn_Score{thr} SimClustersEn",
-                   f"Score{thr}/Merge_vs_Pt 'Merge Rate vs p_{{T}}' Score{thr}/SimClustersMultiMatchedRecoClustersPt_Score{thr} SimClustersPt",
-                   f"Score{thr}/Merge_vs_Eta 'Merge Rate vs #eta' Score{thr}/SimClustersMultiMatchedRecoClustersEta_Score{thr} SimClustersEta",
-                   f"Score{thr}/Merge_vs_Phi 'Merge Rate vs #phi' Score{thr}/SimClustersMultiMatchedRecoClustersPhi_Score{thr} SimClustersPhi",
-                   f"Score{thr}/Merge_vs_Mult 'Merge Rate vs Multiplicity' Score{thr}/SimClustersMultiMatchedRecoClustersMult_Score{thr} SimClustersMult",
+                   f"'Score{thr}/Merge_vs_En {recble}' 'Merge Rate vs Energy {recble}' Score{thr}/SimClustersMultiMatchedRecoClustersEn_Score{thr} SimClusters{recble}En",
+                   f"'Score{thr}/Merge_vs_Pt {recble}' 'Merge Rate vs p_{{T}} {recble}' Score{thr}/SimClustersMultiMatchedRecoClustersPt_Score{thr} SimClusters{recble}Pt",
+                   f"'Score{thr}/Merge_vs_Eta {recble}' 'Merge Rate vs #eta {recble}' Score{thr}/SimClustersMultiMatchedRecoClustersEta_Score{thr} SimClusters{recble}Eta",
+                   f"'Score{thr}/Merge_vs_Phi {recble}' 'Merge Rate vs #phi {recble}' Score{thr}/SimClustersMultiMatchedRecoClustersPhi_Score{thr} SimClusters{recble}Phi",
+                   f"'Score{thr}/Merge_vs_Mult {recble}' 'Merge Rate vs Multiplicity {recble}' Score{thr}/SimClustersMultiMatchedRecoClustersMult_Score{thr} SimClusters{recble}Mult",
            )
           ],
     ),

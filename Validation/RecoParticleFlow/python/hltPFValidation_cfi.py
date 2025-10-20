@@ -30,7 +30,7 @@ hltPFTesterECAL = cms.EDProducer("PFTester",
     SimClusterHCAL = cms.InputTag("mix","MergedCaloTruth"),
     PFClusterSimClusterAssociatorHCAL = cms.InputTag("hltPFClusterSimClusterAssociationProducerECAL"),
     PFClusterCaloParticleAssociatorHCAL = cms.InputTag("hltPFClusterCaloParticleAssociationProducerECAL"),
-    assocScoreThresholds = cms.vdouble(0., 0.1)
+    assocScoreThresholds = cms.vdouble(1.1, 0.9, 0.1)
 )
 
 PFValSeq = cms.Sequence(
