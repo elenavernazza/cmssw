@@ -30,6 +30,15 @@ def checkRootDir(afile, adir):
     if not afile.Get(adir):
         raise RuntimeError(f"Directory '{adir}' not found in {afile}")
 
+def GetRootSubDir(afile, adir):
+    subdirs = []
+    d = afile.GetDirectory(adir)
+    for key in d.GetListOfKeys():
+        obj = key.ReadObj()
+        if isinstance(obj, ROOT.TDirectory):
+            subdirs.append(obj.GetName())
+    return subdirs
+
 def checkRootFile(afile, hname, rebin=None):
     hist_orig = afile.Get(hname)
     if not hist_orig:
@@ -155,7 +164,7 @@ class Plotter:
             plt.savefig(name + '.' + ext)
         plt.close()
 
-def plotEffComp1D(afile, adir, vars1d, outdir, text, top_text=False):
+def plotEffComp1D(afile, adir, vars1d, outdir, text, top_text=False, suffix=''):
     """
     Plots 1D distributions.
     The `avars` variables is a dictionary whose values are (xlabel, ylabel, rebin).
@@ -168,7 +177,9 @@ def plotEffComp1D(afile, adir, vars1d, outdir, text, top_text=False):
     valuesList, errorsList = [], []
     colors_iter = iter(('black', 'blue'))
     for avar in vars1d:
-        name, (xlabel, _, rebin, logy, leglabel) = avar
+        name, (xlabel, ylabel, rebin, logy, doNormalize, leglabel) = avar
+        if doNormalize:
+            ylabel = '[a.u.]'
 
         root_hist = checkRootFile(afile, f"{adir}/{name}", rebin=rebin)
         nbins, bin_edges, bin_centers, bin_widths = define_bins(root_hist)
@@ -176,8 +187,10 @@ def plotEffComp1D(afile, adir, vars1d, outdir, text, top_text=False):
         errors /= 2
 
         # normalization
-        errors /= sum(values)
-        values /= sum(values)
+        doNormalize = False
+        if 'Eff' not in name and doNormalize:
+            errors /= sum(values)
+            values /= sum(values)
 
         if 'Eff' in name:
             # ax2.set_yscale('log')
@@ -199,7 +212,7 @@ def plotEffComp1D(afile, adir, vars1d, outdir, text, top_text=False):
         errorsList.append(errors)
 
     plotter.limits_with_margin(valuesList, errorsList, logY=logy)
-    plotter.labels(x=xlabel, y='[a.u.]', legend_title='')
+    plotter.labels(x=xlabel, y=ylabel, legend_title='')
 
     plotter.ax.text(0.03, 0.97, text, transform=plotter.ax.transAxes, fontsize=fontsize,
                     verticalalignment='top', horizontalalignment='left')
@@ -214,7 +227,7 @@ def plotEffComp1D(afile, adir, vars1d, outdir, text, top_text=False):
     plotter.ax.grid(color=eff_color, axis='x')
     
     plt.tight_layout()
-    plotter.save( os.path.join(outdir, name + 'Comp') )
+    plotter.save( os.path.join(outdir, name) )
 
 def plot1Dvars(afile, adir, avars, outdir, text, top_text=False):
     for var, (xlabel, ylabel, rebin, logy, _) in avars.items():
@@ -240,7 +253,7 @@ def plot1Dvars(afile, adir, avars, outdir, text, top_text=False):
                             verticalalignment='top', horizontalalignment='right')
 
         plt.tight_layout()
-        plotter.save( os.path.join(outdir, var) )
+        plotter.save( os.path.join(outdir, var, suffix) )
 
 
 if __name__ == '__main__':
@@ -285,38 +298,37 @@ if __name__ == '__main__':
 
     nEventsLabel = '# Events'
     effLabel = 'Efficiency'
-    vars1D = {
-        # PF tester producer
-        **{x + 'ClustersEnergy': ('Energy [GeV]', nEventsLabel, None, True, x) for x in ('Sim', 'Reco')},
-        'Eff_vs_Energy': ('Energy [GeV]', effLabel, None, True, None),
-        **{x + 'ClustersPt': (r'$p_{T}$ [GeV]', nEventsLabel, None, True, x) for x in ('Sim', 'Reco')},
-        'Eff_vs_Pt': (r'$p_{T}$ [GeV]', effLabel, None, False, None),
-        **{x + 'ClustersEta': (r'$\eta$', nEventsLabel, None, False, x) for x in ('Sim', 'Reco')},
-        'Eff_vs_Eta': (r'$\eta$', effLabel, None, True, None),
-        **{x + 'ClustersPhi': (r'$\phi$', nEventsLabel, None, False, x) for x in ('Sim', 'Reco')},
-        'Eff_vs_Phi': (r'$\phi$', effLabel, None, True, None),
-        **{x + 'ClustersMult': ('Multiplicity', nEventsLabel, None, True, x) for x in ('Sim', 'Reco')},
-        'Eff_vs_Mult': ('Multiplicity', effLabel, None, False, None),
-    }
 
     dqm_dir = f"DQMData/Run 1/HLT/Run summary/ParticleFlow/PFClusterValidation"
-    if args.compare_files is not None:
-        for afile, alabel in zip(args.compare_files, args.compare_files_labels):
-            afile = ROOT.TFile.Open(afile)
-            checkRootDir(afile, dqm_dir)
-        plot1DFilesComparison(dqm_dir, vars1D, outdir=args.odir, text='',
-                              files=args.compare_files,
-                              files_labels=args.compare_files_labels)
+    afile = ROOT.TFile.Open(args.file)
 
-    else:
-        afile = ROOT.TFile.Open(args.file)
+    checkRootDir(afile, dqm_dir)
+    subdirs = GetRootSubDir(afile, dqm_dir)
+    for subdir in subdirs:
+        checkRootDir(afile, f"{dqm_dir}/{subdir}")
+        createDir(f'{args.odir}/{subdir}')
+        for recble in ('', ' Reconstructable'):
+            vars1D = {
+                # PF tester producer
+                f'SimClusters{recble.strip()}En': ('Energy [GeV]', nEventsLabel, None, True, False, 'Sim'),
+                f'{subdir}/RecoClustersMatchedSimClustersEn_{subdir}': ('Energy [GeV]', nEventsLabel, None, True, False, 'Reco'),
+                f'{subdir}/Eff_vs_Energy{recble}': ('Energy [GeV]', nEventsLabel, None, True, False, None),
+                f'SimClusters{recble.strip()}Pt': (r'$p_{T}$ [GeV]', nEventsLabel, None, True, False, 'Sim'),
+                f'{subdir}/RecoClustersMatchedSimClustersPt_{subdir}': (r'$p_{T}$ [GeV]', nEventsLabel, None, True, False, 'Reco'),
+                f'{subdir}/Eff_vs_Pt{recble}': (r'$p_{T}$ [GeV]', nEventsLabel, None, True, False, None),
+                f'SimClusters{recble.strip()}Eta': (r'$\eta$', nEventsLabel, None, False, False, 'Sim'),
+                f'{subdir}/RecoClustersMatchedSimClustersEta_{subdir}': (r'$\eta$', nEventsLabel, None, False, False, 'Reco'),
+                f'{subdir}/Eff_vs_Eta{recble}': (r'$\eta$', nEventsLabel, None, False, False, None),
+                f'SimClusters{recble.strip()}Phi': (r'$\phi$', nEventsLabel, None, False, False, 'Sim'),
+                f'{subdir}/RecoClustersMatchedSimClustersPhi_{subdir}': (r'$\phi$', nEventsLabel, None, False, False, 'Reco'),
+                f'{subdir}/Eff_vs_Phi{recble}': (r'$\phi$', nEventsLabel, None, False, False, None),
+                # f'SimClusters{recble.strip()}Mult': ('Multiplicity', nEventsLabel, None, True, False, 'Sim'),
+                # f'{subdir}/RecoClustersMatchedSimClustersMult_{subdir}': ('Multiplicity', nEventsLabel, None, True, False, 'Reco'),
+                # f'{subdir}/Eff_vs_Mult {recble}': ('Multiplicity', nEventsLabel, None, True, False, None),
+            }
 
-        # Plot 1D PF variables
-        checkRootDir(afile, dqm_dir)
-        # plot1Dvars(afile, dqm_dir, vars1D, outdir=args.odir, text='')
-
-        # Compare pairs of variables
-        it = iter(vars1D.items())
-        for var in it:
-            avars = (var, next(it), next(it)) # reco, sim and efficiency for a given variable
-            plotEffComp1D(afile, dqm_dir, vars1d=avars, outdir=args.odir, text='')
+            # Compare pairs of variables
+            it = iter(vars1D.items())
+            for var in it:
+                avars = (var, next(it), next(it)) # reco, sim and efficiency for a given variable
+                plotEffComp1D(afile, dqm_dir, vars1d=avars, outdir=args.odir, text='', suffix=f'')
