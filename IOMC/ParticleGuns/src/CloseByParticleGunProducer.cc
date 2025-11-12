@@ -52,7 +52,8 @@ CloseByParticleGunProducer::CloseByParticleGunProducer(const ParameterSet& pset)
     fEtaMin = pgun_params.getParameter<double>("MinEta");
     if (fEtaMax <= fEtaMin)
       throw cms::Exception("CloseByParticleGunProducer") << " Please fix MinEta and MaxEta values in the configuration";
-  } else {
+  }
+  if (!fControlledByEta) {
     fRMax = pgun_params.getParameter<double>("RMax");
     fRMin = pgun_params.getParameter<double>("RMin");
     if (fRMax <= fRMin)
@@ -61,7 +62,6 @@ CloseByParticleGunProducer::CloseByParticleGunProducer(const ParameterSet& pset)
   if (!fControlledByREta) {
     fZMax = pgun_params.getParameter<double>("ZMax");
     fZMin = pgun_params.getParameter<double>("ZMin");
-
     if (fZMax <= fZMin)
       throw cms::Exception("CloseByParticleGunProducer") << " Please fix ZMin and ZMax values in the configuration";
   }
@@ -167,7 +167,7 @@ void CloseByParticleGunProducer::produce(Event& e, const EventSetup& es) {
   } else {
     fR = CLHEP::RandFlat::shoot(engine, fRMin, fRMax);
     fEta = CLHEP::RandFlat::shoot(engine, fEtaMin, fEtaMax);
-    fZ = sinh(fEta) / fR;
+    fZ = sinh(fEta) * fR;
   }
 
   if (fUseDeltaT) {
@@ -185,7 +185,7 @@ void CloseByParticleGunProducer::produce(Event& e, const EventSetup& es) {
       fR = CLHEP::RandFlat::shoot(engine, tmpR - fDelta, tmpR + fDelta);
       phi = CLHEP::RandFlat::shoot(engine, tmpPhi - fDelta / fR, tmpPhi + fDelta / fR);
     } else
-      phi += fDelta / fR;
+      phi += (ip == 0 ? 0. : fDelta / fR);
 
     double fVar;
     if (numParticles > 1 && fMaxVarSpread)
@@ -194,7 +194,6 @@ void CloseByParticleGunProducer::produce(Event& e, const EventSetup& es) {
       double fVar_log = CLHEP::RandFlat::shoot(engine, log_fVarMin, log_fVarMax);
       fVar = std::exp(fVar_log);
     }
-
     else
       fVar = CLHEP::RandFlat::shoot(engine, fVarMin, fVarMax);
 
@@ -228,8 +227,8 @@ void CloseByParticleGunProducer::produce(Event& e, const EventSetup& es) {
     // Compute Vertex Position
     double x = fR * cos(phi);
     double y = fR * sin(phi);
-
     HepMC::FourVector p(px, py, pz, energy);
+
     // If we are requested to be pointing to (0,0,0), correct the momentum direction
     if (fPointing) {
       math::XYZVector direction(x, y, fZ);
@@ -238,7 +237,7 @@ void CloseByParticleGunProducer::produce(Event& e, const EventSetup& es) {
       p.setY(momentum.y());
       p.setZ(momentum.z());
     }
-
+	
     // compute correct path assuming uniform magnetic field in CMS
     double pathLength = 0.;
     const double speed = p.pz() / p.e() * c_light / CLHEP::cm;
@@ -258,7 +257,7 @@ void CloseByParticleGunProducer::produce(Event& e, const EventSetup& es) {
 
     HepMC::GenVertex* Vtx =
         new HepMC::GenVertex(HepMC::FourVector(x * CLHEP::cm, y * CLHEP::cm, fZ * CLHEP::cm, timeOffset));
-
+	
     HepMC::GenParticle* Part = new HepMC::GenParticle(p, PartID, 1);
     Part->suggest_barcode(barcode);
     barcode++;
