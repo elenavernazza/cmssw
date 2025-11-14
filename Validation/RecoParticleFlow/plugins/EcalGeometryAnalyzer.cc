@@ -40,7 +40,7 @@ private:
   void endJob() override {}
   double inBarrel(const DetId& id);
   double distFromCenter(GlobalPoint point);
-	
+
   edm::ESGetToken<CaloGeometry, CaloGeometryRecord> caloGeomToken_;
   edm::EDGetTokenT<reco::PFRecHitCollection> recHitToken_;
   edm::EDGetTokenT<std::vector<PCaloHit>> simHitToken_;
@@ -113,7 +113,7 @@ double EcalGeometryAnalyzer::inBarrel(const DetId& id) {
 }
 
 double EcalGeometryAnalyzer::distFromCenter(GlobalPoint point) {
-  return std::sqrt(point.x()*point.x() + point.y()*point.y());
+  return std::sqrt(point.x() * point.x() + point.y() * point.y());
 }
 
 void EcalGeometryAnalyzer::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup) {
@@ -127,14 +127,13 @@ void EcalGeometryAnalyzer::analyze(const edm::Event& iEvent, const edm::EventSet
 
   // Geometry fill
   if (eventId == 1) {
-
     for (auto& did : detids) {
-	  if(did.subdetId() != EcalBarrel) {
-		throw std::runtime_error("Error");
-		continue;
-	  }
-	  
-	  const CaloCellGeometry* cellGeom = barrelGeom->getGeometry(did);
+      if (did.subdetId() != EcalBarrel) {
+        throw std::runtime_error("Error");
+        continue;
+      }
+
+      const CaloCellGeometry* cellGeom = barrelGeom->getGeometry(did);
       crystalDetId_ = did.rawId();
       crystalCenterEta_ = cellGeom->getPosition().eta();
       crystalCenterPhi_ = cellGeom->getPosition().phi();

@@ -193,8 +193,7 @@ void CloseByParticleGunProducer::produce(Event& e, const EventSetup& es) {
     else if (fLogSpacedVar) {
       double fVar_log = CLHEP::RandFlat::shoot(engine, log_fVarMin, log_fVarMax);
       fVar = std::exp(fVar_log);
-    }
-    else
+    } else
       fVar = CLHEP::RandFlat::shoot(engine, fVarMin, fVarMax);
 
     int partIdx = CLHEP::RandFlat::shoot(engine, 0, fPartIDs.size());
@@ -237,7 +236,7 @@ void CloseByParticleGunProducer::produce(Event& e, const EventSetup& es) {
       p.setY(momentum.y());
       p.setZ(momentum.z());
     }
-	
+
     // compute correct path assuming uniform magnetic field in CMS
     double pathLength = 0.;
     const double speed = p.pz() / p.e() * c_light / CLHEP::cm;
@@ -257,7 +256,7 @@ void CloseByParticleGunProducer::produce(Event& e, const EventSetup& es) {
 
     HepMC::GenVertex* Vtx =
         new HepMC::GenVertex(HepMC::FourVector(x * CLHEP::cm, y * CLHEP::cm, fZ * CLHEP::cm, timeOffset));
-	
+
     HepMC::GenParticle* Part = new HepMC::GenParticle(p, PartID, 1);
     Part->suggest_barcode(barcode);
     barcode++;
