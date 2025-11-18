@@ -70,8 +70,11 @@ private:
   template <typename T>
   using UMap = std::unordered_map<std::string, T>;
 								  
-  UMap<unsigned> nHits_;
+  UMap<unsigned> nClusters_;
+  UMap<std::vector<unsigned>> nHitsInCluster_;
+  UMap<std::vector<float>> clusterEnergy_;
   UMap<std::vector<float>> energies_;
+  UMap<std::vector<float>> fractions_;
   UMap<std::vector<unsigned>> detids_;
 };
 
@@ -111,9 +114,12 @@ void EcalGeometryAnalyzer::beginJob() {
   eventTree_->Branch("eventId", &eventId_);
 
   for (auto& prefix : prefixes_) {
-	eventTree_->Branch(("nHits" + prefix).c_str(), &nHits_[prefix]);
-	eventTree_->Branch(("energies" + prefix).c_str(), &energies_[prefix]);
-	eventTree_->Branch(("detids" + prefix).c_str(), &detids_[prefix]);
+	eventTree_->Branch((prefix + "_nClusters").c_str(), &nClusters_[prefix]);
+	eventTree_->Branch((prefix + "_clHits").c_str(), &nHitsInCluster_[prefix]);
+	eventTree_->Branch((prefix + "_clEnergy").c_str(), &clusterEnergy_[prefix]);
+	eventTree_->Branch((prefix + "_energies").c_str(), &energies_[prefix]);
+	eventTree_->Branch((prefix + "_fractions").c_str(), &fractions_[prefix]);
+	eventTree_->Branch((prefix + "_detids").c_str(), &detids_[prefix]);
   }
 }
 
@@ -168,33 +174,85 @@ void EcalGeometryAnalyzer::analyze(const edm::Event& iEvent, const edm::EventSet
     edm::LogInfo("EcalGeometryAnalyzer") << "Input recHit collection not found.";
     return;
   }
+  edm::Handle<reco::PFClusterCollection> pfClusters_;
+  iEvent.getByToken(PFClusterToken_, pfClusters_);
+  if (!pfClusters_.isValid()) {
+    edm::LogInfo("PFTester") << "Input PFCluster collection not found.";
+    return;
+  }
   edm::Handle<std::vector<PCaloHit>> simHits_;
   iEvent.getByToken(SimHitToken_, simHits_);
   if (!simHits_.isValid()) {
     edm::LogInfo("EcalGeometryAnalyzer") << "Input simHit collection not found.";
     return;
   }
-
+  edm::Handle<SimClusterCollection> simClusters_;
+  iEvent.getByToken(SimClusterToken_, simClusters_);
+  if (!simClusters_.isValid()) {
+    edm::LogInfo("PFTester") << "Input SimCluster collection not found.";
+    return;
+  }
+  
   auto recHits = *recHits_;
+  auto recoClusters = *pfClusters_;
   auto simHits = *simHits_;
+  auto simClusters = *simClusters_;
 
-  // Event fill
-  nHits_["Reco"] = recHits.size();
-  for (auto& rechit : recHits) {
-    DetId id(rechit.detId());
-    if (!inBarrel(id))
-      continue;
-    detids_["Reco"].push_back(rechit.detId());
-    energies_["Reco"].push_back(rechit.energy());
+  // Clear vectors
+  for (auto& prefix : prefixes_) {
+    nClusters_[prefix] = 0;
+    nHitsInCluster_[prefix].clear();
+    clusterEnergy_[prefix].clear();
+    energies_[prefix].clear();
+    fractions_[prefix].clear();
+    detids_[prefix].clear();
   }
 
-  nHits_["Sim"] = simHits.size();
-  for (auto& simhit : simHits) {
-    DetId id(simhit.id());
-    if (!inBarrel(id))
-      continue;
-    detids_["Sim"].push_back(simhit.id());
-    energies_["Sim"].push_back(simhit.energy());
+  // Event fill
+  float fraction = 0;
+  float energy = 0;
+  float rec_energy = 0;
+  nClusters_["Reco"] = recoClusters.size();
+  for (auto& recoCluster : recoClusters) {
+    for (const auto& hitFracPair : recoCluster.hitsAndFractions()) {
+      DetId hitId = hitFracPair.first;
+      if (!inBarrel(hitId))
+        continue;
+      fraction = hitFracPair.second;
+      for (auto& rechit : recHits) {
+        DetId id(rechit.detId());
+        if (hitId == id) {
+          energy = rechit.energy();
+          rec_energy += energy;
+          break;
+        }
+      }
+      nHitsInCluster_["Reco"].push_back(recoCluster.recHitFractions().size());
+      clusterEnergy_["Reco"].push_back(rec_energy);
+      energies_["Reco"].push_back(energy);
+      fractions_["Reco"].push_back(fraction);
+      detids_["Reco"].push_back(hitId);
+    }
+  }
+
+  float sim_energy = 0;
+  nClusters_["Sim"] = simClusters.size();
+  for (auto& simCluster : simClusters) {
+    const auto& hits_fractions = simCluster.hits_and_fractions();
+    const auto& hits_energies = simCluster.hits_and_energies();
+    auto itF = hits_fractions.begin();
+    auto itE = hits_energies.begin();
+    for (; itF != hits_fractions.end() && itE != hits_energies.end(); ++itF, ++itE) {
+      DetId hitId = itF->first;
+      if (!inBarrel(hitId))
+        continue;
+      sim_energy += itE->second*itF->second;
+      nHitsInCluster_["Sim"].push_back(simCluster.hits_and_fractions().size());
+      energies_["Sim"].push_back(itE->second);
+      fractions_["Sim"].push_back(itF->second);
+      detids_["Sim"].push_back(hitId);
+    }
+    clusterEnergy_["Sim"].resize(simCluster.hits_and_fractions().size(), sim_energy);
   }
 
   eventTree_->Fill();

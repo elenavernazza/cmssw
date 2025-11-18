@@ -54,18 +54,25 @@ def plotEvent(event, geom, out, zoom):
     hep.cms.lumitext("CloseByElectron | 14 TeV", **params)
 
     cmap = cm.viridis
-    norm = mcolors.Normalize(vmin=df_merged.energy.min(), vmax=df_merged.energy.max())
+    norm = mcolors.Normalize(vmin=event.energy.min(), vmax=event.energy.max())
+
+    # import pdb; pdb.set_trace()
+
+    max_rows = df_merged[df_merged.energy > 0.5*df_merged.energy.max()]
 
     # Add rectangles
     pat = []
+    pat_max = []
     for row in df_merged.itertuples(index=False):
         sq = patches.Rectangle((row.crystalCorner2Eta, row.crystalCorner2Phi),
                                abs(row.crystalCorner2Eta-row.crystalCorner0Eta),
                                abs(row.crystalCorner2Phi-row.crystalCorner0Phi))
         pat.append(sq)
+        if row.detid in max_rows.detid.values: pat_max.append(sq)
 
-    colors = cmap(norm(df_merged.energy.values))
+    colors = cmap(norm(event.energy.values))
     ax.add_collection(coll.PatchCollection(pat, facecolor=colors, edgecolor='black'))
+    ax.add_collection(coll.PatchCollection(pat_max, facecolor='red', edgecolor='red', linewidth=1.5, zorder=10))
 
     # Add colorbar
     sm = cm.ScalarMappable(cmap=cmap, norm=norm)
@@ -85,6 +92,7 @@ def plotEvent(event, geom, out, zoom):
     
     for ext in ('.pdf', '.png'):
         fig.savefig(out + ext)
+    print(f" ### INFO: Saving figure {out + ext}")
     
 def showECAL(infile, indir, outfile, props):
     varsGeom = ['crystalDetId', 'crystalCenterEta', 'crystalCenterPhi',
@@ -94,7 +102,7 @@ def showECAL(infile, indir, outfile, props):
     varsEventCommon = ['eventId']
     varsEvent = {"Reco": [], "Sim": []}
     for prefix in ("Reco", "Sim"):
-        varsEvent[prefix].extend([x+prefix for x in ('energies', 'detids', 'nHits')])
+        varsEvent[prefix].extend([prefix+"_"+x for x in ('energies', 'detids', 'clHits')])
     varsEventAll = varsEventCommon + varsEvent['Reco'] + varsEvent['Sim']
         
     with uproot.open(infile) as file:
@@ -111,22 +119,17 @@ def showECAL(infile, indir, outfile, props):
     # dfGeom = dfGeom[filt(dfGeom)]
     plotGeom(dfGeom)
 
-    for t in range(1, props.nevents+1):
-        print(f'INFO: Processing event {t}...')
+    for i, ev in enumerate(dfEvent.eventId):
+        print(f'INFO: Processing event {i}...')
 
         for prefix in ("Reco", "Sim"):
-            outname = "event" + prefix + str(t)
+            outname = "event" + str(i) + '_' + prefix
             if props.zoom:
                 outname += "_zoom"
 
-            dfEventTmp = dfEvent[dfEvent.eventId==t]
-            if prefix == "Sim": # energy cut to reduce hit multiplicity in plot
-                en_mask = dfEventTmp.energiesSim > 0.2
-                dfEventTmp['energies'+prefix] = dfEventTmp['energies'+prefix][en_mask]
-                dfEventTmp['detids'+prefix] = dfEventTmp['detids'+prefix][en_mask]
-
-            dfEventTmp = pd.DataFrame({'energy': dfEventTmp['energies'+prefix][0],
-                                       'detid': dfEventTmp['detids'+prefix][0]})
+            dfEventTmp = dfEvent[dfEvent.eventId==ev]
+            dfEventTmp = pd.DataFrame({'energy': dfEventTmp[prefix+'_'+'energies'][0],
+                                       'detid': dfEventTmp[prefix+'_'+'detids'][0]})
 
             plotEvent(dfEventTmp, dfGeom, out=os.path.join(outfile,outname), zoom=props.zoom)
         
