@@ -19,8 +19,12 @@
 #include "FWCore/ServiceRegistry/interface/Service.h"
 #include "CommonTools/UtilAlgos/interface/TFileService.h"
 
+#include "DataFormats/ParticleFlowReco/interface/PFCluster.h"
+#include "DataFormats/ParticleFlowReco/interface/PFClusterFwd.h"
 #include "DataFormats/ParticleFlowReco/interface/PFRecHit.h"
 #include "DataFormats/ParticleFlowReco/interface/PFRecHitFwd.h"
+#include "SimDataFormats/CaloAnalysis/interface/SimCluster.h"
+#include "SimDataFormats/CaloAnalysis/interface/SimClusterFwd.h"
 #include "SimDataFormats/CaloHit/interface/PCaloHit.h"
 
 #include <iostream>
@@ -42,8 +46,10 @@ private:
   double distFromCenter(GlobalPoint point);
 
   edm::ESGetToken<CaloGeometry, CaloGeometryRecord> caloGeomToken_;
-  edm::EDGetTokenT<reco::PFRecHitCollection> recHitToken_;
-  edm::EDGetTokenT<std::vector<PCaloHit>> simHitToken_;
+  edm::EDGetTokenT<reco::PFRecHitCollection> RecHitToken_;
+  edm::EDGetTokenT<reco::PFClusterCollection> PFClusterToken_;
+  edm::EDGetTokenT<std::vector<PCaloHit>> SimHitToken_;
+  edm::EDGetTokenT<SimClusterCollection> SimClusterToken_;
   TTree *geomTree_, *eventTree_;
 
   unsigned crystalDetId_;
@@ -71,8 +77,10 @@ private:
 
 EcalGeometryAnalyzer::EcalGeometryAnalyzer(const edm::ParameterSet& iConfig)
   : caloGeomToken_(esConsumes<CaloGeometry, CaloGeometryRecord>()),
-	recHitToken_(consumes<reco::PFRecHitCollection>(iConfig.getParameter<edm::InputTag>("recHits"))),
-	simHitToken_(consumes<std::vector<PCaloHit>>(iConfig.getParameter<edm::InputTag>("simHits"))) {
+	RecHitToken_(consumes<reco::PFRecHitCollection>(iConfig.getParameter<edm::InputTag>("RecHits"))),
+  PFClusterToken_(consumes<reco::PFClusterCollection>(iConfig.getParameter<edm::InputTag>("PFCluster"))),
+	SimHitToken_(consumes<std::vector<PCaloHit>>(iConfig.getParameter<edm::InputTag>("SimHits"))),
+  SimClusterToken_(consumes<SimClusterCollection>(iConfig.getParameter<edm::InputTag>("SimCluster"))) {
   edm::Service<TFileService> fs;
   geomTree_ = fs->make<TTree>("Geometry", "Geometry data");
   eventTree_ = fs->make<TTree>("Event", "Event data");
@@ -80,8 +88,10 @@ EcalGeometryAnalyzer::EcalGeometryAnalyzer(const edm::ParameterSet& iConfig)
 
 void EcalGeometryAnalyzer::fillDescriptions(edm::ConfigurationDescriptions& descriptions) {
   edm::ParameterSetDescription desc;
-  desc.add<edm::InputTag>("recHits", edm::InputTag("hltParticleFlowRecHitECALUnseeded"));
-  desc.add<edm::InputTag>("simHits", edm::InputTag("g4SimHits", "EcalHitsEB"));
+  desc.add<edm::InputTag>("RecHits", edm::InputTag("hltParticleFlowRecHitECALUnseeded"));
+  desc.add<edm::InputTag>("PFCluster", edm::InputTag("hltParticleFlowClusterECALUnseeded"));
+  desc.add<edm::InputTag>("SimHits", edm::InputTag("g4SimHits", "EcalHitsEB"));
+  desc.add<edm::InputTag>("SimCluster", edm::InputTag("mix", "MergedCaloTruth"));
   descriptions.add("ecalGeometryAnalyzer", desc);
 }
 
@@ -153,13 +163,13 @@ void EcalGeometryAnalyzer::analyze(const edm::Event& iEvent, const edm::EventSet
   }  // if (eventId == 1)
 
   edm::Handle<reco::PFRecHitCollection> recHits_;
-  iEvent.getByToken(recHitToken_, recHits_);
+  iEvent.getByToken(RecHitToken_, recHits_);
   if (!recHits_.isValid()) {
     edm::LogInfo("EcalGeometryAnalyzer") << "Input recHit collection not found.";
     return;
   }
   edm::Handle<std::vector<PCaloHit>> simHits_;
-  iEvent.getByToken(simHitToken_, simHits_);
+  iEvent.getByToken(SimHitToken_, simHits_);
   if (!simHits_.isValid()) {
     edm::LogInfo("EcalGeometryAnalyzer") << "Input simHit collection not found.";
     return;

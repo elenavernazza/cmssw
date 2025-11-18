@@ -1,4 +1,15 @@
 import FWCore.ParameterSet.Config as cms
+import FWCore.ParameterSet.VarParsing as VarParsing
+
+# cmsRun <full_path_to>/ecalGeometryAnalyzer_cfg.py input=file:step2.root maxEvents=10
+options = VarParsing.VarParsing('analysis')
+options.register(
+    'input', '',
+    VarParsing.VarParsing.multiplicity.list,
+    VarParsing.VarParsing.varType.string,
+    "Input file(s)"
+)
+options.parseArguments()
 
 process = cms.Process("EcalGeometryAnalyzer")
 
@@ -32,20 +43,17 @@ process.load("FWCore.MessageService.MessageLogger_cfi")
 process.MessageLogger.cerr.FwkReport.reportEvery = 1
 
 process.maxEvents = cms.untracked.PSet(
-    input = cms.untracked.int32(100)
+    input = cms.untracked.int32(options.maxEvents)
 )
 
 process.source = cms.Source("PoolSource",
-    fileNames = cms.untracked.vstring(
-        # 'file:CloseByPGun_Barrel_Front_9p16_PDGID11.root'
-        'file:step2p2_SingleElectron.root',
-    )
+    fileNames = cms.untracked.vstring(options.input)
 )
 
 process.ecalGeometryAnalyzer = cms.EDAnalyzer(
     'EcalGeometryAnalyzer',
-    recHits = cms.InputTag("hltParticleFlowRecHitECALUnseeded"),
-    simHits = cms.InputTag("g4SimHits", "EcalHitsEB")
+    # RecHits = cms.InputTag("hltParticleFlowRecHitECALUnseeded"),
+    # SimHits = cms.InputTag("g4SimHits", "EcalHitsEB")
 )
 
 process.p = cms.Path(process.ecalGeometryAnalyzer)
