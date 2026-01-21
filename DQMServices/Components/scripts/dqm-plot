@@ -21,6 +21,7 @@ import urllib.request
 import urllib.error
 from pathlib import Path
 from matplotlib import colors as _mcolors
+from matplotlib.transforms import blended_transform_factory
 
 # Suppress numpy warnings about subnormal float values
 warnings.filterwarnings("ignore", category=UserWarning, module="numpy")
@@ -146,8 +147,35 @@ class DQMPlotter:
         
         return xlabel, ylabel
 
+    def _rate_errorbar_declutter(self, ax, eff, err, frac=0.01):
+        """
+        Filter uncertainties if they lie below the minimum (vertical) axis value.
+        Used to plot the filtered points differently, for instance by displaying only the upper uncertainty.
+        Uncertainties are trimmed to 1. or 0. if these values are crossed
+        (the retrieved Clopper-Pearson uncertainties have been symmetrized in the DQMGenericClient).
+        """
+        # filt = eff-err/2 <= yaxmin
+        eff_filt = eff #np.where(filt, np.nan, eff)
+        err_filt = err #np.where(filt, np.nan, err)
+        
+        up_error = eff_filt + err_filt/2
+        transform = blended_transform_factory(ax.transData, ax.transAxes)
+        up_error = np.where(np.isnan(up_error), frac, up_error) # place at 0.9% above the minimum vertical axis value
+        up_error = np.where(up_error != frac, np.nan, up_error)
+
+        filt_limit_one = eff_filt+err_filt/2 > 1.
+        filt_limit_zero = eff_filt-err_filt/2 < 0.
+        err_hi = np.where(filt_limit_one, 0., err_filt)
+        err_lo = np.where(filt_limit_zero, 0., err_filt)
+        return eff_filt, (err_lo/2,err_hi/2), up_error, transform
+
     def _plot_histogram_data(self, ax, bin_centers, bin_contents, bin_errors, bin_edges, 
                            label, color_idx, plot_histograms):
+        
+        yerr = bin_errors
+        if 'eff' in args.source[0][0].lower():
+            eff_filt, (err_filt_lo, err_filt_hi), up_error, transform = self._rate_errorbar_declutter(ax, bin_contents, bin_errors)
+            yerr = [err_filt_lo,err_filt_hi]
         """Plot histogram data either as histogram or error bars."""
         if plot_histograms:
             hep.histplot(
@@ -164,7 +192,7 @@ class DQMPlotter:
             ax.errorbar(
                 bin_centers,
                 bin_contents,
-                yerr=bin_errors,
+                yerr=yerr,
                 label=label,
                 color=self.colors[color_idx % len(self.colors)],
                 fmt=self.markers[color_idx % len(self.markers)],
@@ -308,16 +336,15 @@ class DQMPlotter:
             or (len(wrapped_labels) > 8 and max_label_length > 20)
         )
 
-        legend_columns = 1 if len(wrapped_labels) <= 2 else 2
-        legend_fontsize = "22"
+        legend_columns = 1 if len(wrapped_labels) <= 2 else 3
+        legend_fontsize = "20"
+        legend_title_fontsize = "20"
         if len(wrapped_labels) > 6:
-            legend_fontsize = "20"
-        if len(wrapped_labels) > 10:
             legend_fontsize = "18"
-
-        legend_title_fontsize = "24"
-        if legend_title and len(legend_title) > 30:
-            legend_title_fontsize = "20"
+            legend_title_fontsize = "18"
+        if len(wrapped_labels) > 10:
+            legend_fontsize = "16"
+            legend_title_fontsize = "16"
 
         if place_outside:
             y_min, y_max = ax.get_ylim()
@@ -336,7 +363,7 @@ class DQMPlotter:
             )
             return
 
-        legend_padding = 0.5 if len(wrapped_labels) <= 2 else np.ceil(len(wrapped_labels) / 2) * 0.25
+        legend_padding = 0.05 if len(wrapped_labels) <= 3 else np.ceil(len(wrapped_labels) / 2) * 0.025
         legend_padding = min(legend_padding, 2.0)
         if logy or ax.get_yscale() == "log":
             legend_padding *= 50
@@ -344,11 +371,17 @@ class DQMPlotter:
             legend_padding *= 2
         y_min, y_max = ax.get_ylim()
         y_range = y_max - y_min
-        ax.set_ylim(y_min, y_max + y_range * legend_padding)
+        if 'eff' in args.source[0][0].lower():
+            if legend_title == None:
+                ax.set_ylim(0, 1.2)
+            else:
+                ax.set_ylim(0, 1.3)
+        else:
+            ax.set_ylim(y_min, y_max + legend_padding)
 
         ax.legend(
             wrapped_labels,
-            loc="upper right",
+            loc="upper center",
             ncols=legend_columns,
             title=legend_title,
             fontsize=legend_fontsize,
@@ -699,6 +732,7 @@ class DQMPlotter:
         plot_histograms=False,
         do_ratio=True,
         save_as_pdf=False,
+        legend_title=None,
         legend_outside=False,
         overlay_groups=None,
     ):
@@ -725,18 +759,18 @@ class DQMPlotter:
 
         title, xlabel, ylabel = self.extract_labels_from_hist(histograms[0])
 
-        legend_title = None
-        if hasattr(self, "_current_output_path"):
-            output_parts = self._current_output_path.replace("\\", "/").split("/")
-            if len(output_parts) > 1:
-                # Get the parent directory name (second to last part)
-                legend_title = output_parts[-2] if len(output_parts) >= 2 else None
-                # Ignore legend name for summary plots
-                if "global" in output_parts[-1].lower() or "coll" in output_parts[-1].lower():
-                    legend_title = None
-                # Split long overlay titles at + marker
-                elif legend_title and "+" in legend_title and len(legend_title) > 30:
-                    legend_title = legend_title.replace("+", "\n+")
+        # legend_title = None
+        # if hasattr(self, "_current_output_path"):
+        #     output_parts = self._current_output_path.replace("\\", "/").split("/")
+        #     if len(output_parts) > 1:
+        #         # Get the parent directory name (second to last part)
+        #         legend_title = output_parts[-2] if len(output_parts) >= 2 else None
+        #         # Ignore legend name for summary plots
+        #         if "global" in output_parts[-1].lower() or "coll" in output_parts[-1].lower():
+        #             legend_title = None
+        #         # Split long overlay titles at + marker
+        #         elif legend_title and "+" in legend_title and len(legend_title) > 30:
+        #             legend_title = legend_title.replace("+", "\n+")
 
         fig = plt.figure(figsize=self.figsize)
         gs = gridspec.GridSpec(
@@ -797,8 +831,8 @@ class DQMPlotter:
         # Calculate visible label length by removing LaTeX notation for sizing
         visible_ylabel = re.sub(r"\$[^$]*\$", "X", ylabel)
         label_size = "medium" if len(visible_ylabel) < 20 else "small"
-        if title:
-            ax_main.set_title(title, pad=50)
+        # if title:
+        #     ax_main.set_title(title, pad=50)
         has_negative_values = np.any(bin_contents < 0)
         xlabel, ylabel = self._apply_axis_scaling(ax_main, xlabel, ylabel, title, logy, has_negative_values)
 
@@ -819,6 +853,8 @@ class DQMPlotter:
         ax_main.set_ylabel(ylabel, fontsize=label_size)
 
         self._configure_legend(ax_main, labels, legend_title, logy, force_outside=legend_outside)
+        if 'eff' in args.source[0][0].lower():
+            ax_main.axhline(y=1, color="black", linestyle="--", alpha=0.7)
 
         if grid:
             ax_main.grid(True, alpha=0.75, linestyle="dashdot", linewidth=0.75)
@@ -1074,22 +1110,22 @@ class DQMPlotter:
             print("Adding php index files for web viewing...")
             self._create_web_index_files(output_dir)
 
-    def _generate_output_path(self, hist_path, pattern, output_dir):
+    def _generate_output_path(self, hist_path, matched_pat, output_dir):
         """
         Generate output path preserving folder structure from regex match.
 
         Args:
             hist_path: Full histogram path from ROOT file
-            pattern: Regex pattern used to find the histogram
+            matched_pat: Regex matched_pat used to find the histogram
             output_dir: Base output directory
 
         Returns:
             Output file path with preserved folder structure
         """
-        match = re.search(pattern, hist_path)
+        match = re.search(matched_pat, hist_path)
         if match:
             match_end = match.end()
-            remaining_path = hist_path[match_end:].lstrip("/")
+            remaining_path = hist_path.split("/")[-1]
 
             if remaining_path:
                 path_parts = remaining_path.split("/")
@@ -1287,6 +1323,11 @@ if __name__ == "__main__":
         help="Force legend to be placed outside the plot area",
     )
     parser.add_argument(
+        "--legend-title",
+        action=None,
+        help="Legend title",
+    )
+    parser.add_argument(
         "--overlay",
         action="append",
         help="Overlay histograms from different collections. Specify colon-separated patterns "
@@ -1326,6 +1367,7 @@ if __name__ == "__main__":
         save_as_pdf=args.pdf,
         more_files=args.more_files,
         create_web_index=args.web,
+        legend_title=args.legend_title,
         legend_outside=args.legend_outside,
         overlay_groups=overlay_groups,
         overlay_individual=not args.no_overlay_individual,
