@@ -862,8 +862,16 @@ class DQMPlotter:
 
         self._configure_legend(ax_main, labels, legend_title, logy, force_outside=legend_outside)
 
+        if "Mean" in title:
+            ax_main.axhline(y=1, color="black", linestyle="--", alpha=0.7)
+
         if grid:
             ax_main.grid(True, alpha=0.75, linestyle="dashdot", linewidth=0.75)
+
+        if args.xlim:
+            ax_main.set_xlim(float(args.xlim.split(',')[0]), float(args.xlim.split(',')[1]))
+        if args.ylim:
+            ax_main.set_ylim(float(args.ylim.split(',')[0]), float(args.ylim.split(',')[1]))
 
         self._apply_custom_formatter(ax_main)
 
@@ -894,6 +902,9 @@ class DQMPlotter:
                 ax_ratio.set_ylim(final_min, final_max)
             else:
                 ax_ratio.set_ylim(0.5, 1.5)
+
+            if args.ylim_ratio:
+                ax_ratio.set_ylim(float(args.ylim_ratio.split(',')[0]), float(args.ylim_ratio.split(',')[1]))
 
             if has_labels:
                 ax_ratio.set_xticks(
@@ -1339,6 +1350,10 @@ if __name__ == "__main__":
     parser.add_argument("--revert", action="store_true", help="Revert histogram values (e.g. for fake rates)")
     parser.add_argument("--normalize", action="store_true", help="Normalize histograms")
     parser.add_argument("--rebin", default=None, help="Rebin histograms")
+    parser.add_argument("--xlim", default=None, help="Set x-axis limits (format: min,max)")
+    parser.add_argument("--ylim", default=None, help="Set y-axis limits (format: min,max)")
+    parser.add_argument("--ylim-ratio", default=None, help="Set y-axis limits for ratio plots(format: min,max)")
+
     parser.add_argument(
         "--cms-text",
         default="Preliminary",
