@@ -162,6 +162,13 @@ class DQMPlotter:
             if logx:
                 ax.set_xscale("log")
 
+        if ylabel == 'Fakerate': 
+            ylabel = 'Fake rate'
+
+        if ylabel == 'PV purity efficiency': 
+            ylabel = 'Efficiency'
+
+        print(ylabel)
         return xlabel, ylabel
 
     def _rate_errorbar_declutter(self, ax, eff, err, frac=0.01):
@@ -578,6 +585,8 @@ class DQMPlotter:
             ("pt2", r"$p_{\mathrm{T}}^2$"),
             ("Pt2", r"$p_{\mathrm{T}}^2$"),
             ("pT2", r"$p_{\mathrm{T}}^2$"),
+            ("p_{t}^{2}", r"$p_{\mathrm{T}}^2$"),
+            ("p_{T}^{2}", r"$p_{\mathrm{T}}^2$"),
             ("p_{T}^{gen}", r"$p_{\mathrm{T}}^{\mathrm{gen}}~[GeV]$"),
             ("p_{T}", r"$p_{\mathrm{T}}$"),
             ("p_{t}", r"$p_{\mathrm{T}}$"),
@@ -592,9 +601,13 @@ class DQMPlotter:
             ("Response RecoOverGen", r"$p_{\mathrm{T}}^{\mathrm{reco}}/p_{\mathrm{T}}^{\mathrm{gen}}$"),
         ]
         if units == True:
-            conversions.append(("p_{T}", r"$p_{\mathrm{T}}$ [GeV]"))
-            conversions.append(("p_{t}", r"$p_{\mathrm{T}}$ [GeV]"))
-            conversions.append((r"$p_{\mathrm{T}}$", r"$p_{\mathrm{T}}$ [GeV]"))
+            conversions.insert(0,("Z", r"$\mathrm{z}$ [cm]"))
+            conversions.insert(0,("z", r"$\mathrm{z}$ [cm]"))
+            conversions.insert(0,("p_{T}", r"$p_{\mathrm{T}}$ [GeV]"))
+            conversions.insert(0,("p_{t}", r"$p_{\mathrm{T}}$ [GeV]"))
+            conversions.insert(0,(r"$p_{\mathrm{T}}$", r"$p_{\mathrm{T}}$ [GeV]"))
+            conversions.insert(0,("Sum p_{T}^{2}", r"$\Sigma p_{\mathrm{T}}^2$ [GeV^{2}]"))
+            conversions.insert(0,("Sum p_{T}^{2}", r"$\Sigma p_{\mathrm{T}}^2$ [GeV^{2}]"))
 
         result = text
         for root_notation, mathtext_notation in conversions:
