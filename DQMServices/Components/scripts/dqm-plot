@@ -94,7 +94,7 @@ class DQMPlotter:
 
         self.colors.extend(new_colors)
 
-    def root_to_numpy(self, hist, rebin=None):
+    def root_to_numpy(self, hist, rebin=None, normalize=False):
         """
         Convert ROOT histogram to numpy arrays.
 
@@ -113,6 +113,11 @@ class DQMPlotter:
                 hist = hist.Rebin(len(bin_edges_c) - 1,  hist.GetName() + "_rebin", bin_edges_c)
             else:
                 raise ValueError(f"Unknown type for rebin: {type(rebin)}")
+        
+        if normalize:
+            integral = hist.Integral()
+            if integral > 0:
+                hist.Scale(1.0 / integral)
 
         n_bins = hist.GetNbinsX()
         bin_edges = np.array([hist.GetBinLowEdge(i) for i in range(1, n_bins + 2)])
@@ -168,7 +173,6 @@ class DQMPlotter:
         if ylabel == 'PV purity efficiency': 
             ylabel = 'Efficiency'
 
-        print(ylabel)
         return xlabel, ylabel
 
     def _rate_errorbar_declutter(self, ax, eff, err, frac=0.01):
@@ -494,7 +498,9 @@ class DQMPlotter:
         """
         title = hist.GetTitle()
         xlabel = title
-        ylabel = "Occurrences"
+        ylabel = "Entries"
+        if args.normalize:
+            ylabel = "Normalized Entries"
 
         # Match "vs", "vs.", and flexible spacing/periods between v and s; allow underscores or spaces as delimiters
         vs_regex = re.compile(r'[_\s]+v\s*\.?\s*s\s*\.?[_\s]+', re.IGNORECASE)
@@ -606,6 +612,7 @@ class DQMPlotter:
             conversions.insert(0,("p_{T}", r"$p_{\mathrm{T}}$ [GeV]"))
             conversions.insert(0,("p_{t}", r"$p_{\mathrm{T}}$ [GeV]"))
             conversions.insert(0,(r"$p_{\mathrm{T}}$", r"$p_{\mathrm{T}}$ [GeV]"))
+            conversions.insert(0,("p_{T}^{gen}", r"$p_{\mathrm{T}}^{\mathrm{gen}}$ [GeV]"))
             conversions.insert(0,("Sum p_{T}^{2}", r"$\Sigma p_{\mathrm{T}}^2$ [GeV^{2}]"))
             conversions.insert(0,("Sum p_{T}^{2}", r"$\Sigma p_{\mathrm{T}}^2$ [GeV^{2}]"))
 
@@ -864,13 +871,13 @@ class DQMPlotter:
         
         for i, (hist, label) in enumerate(zip(histograms, labels)):
             bin_centers, bin_contents, bin_errors, bin_edges, bin_labels, has_labels = (
-                self.root_to_numpy(hist, rebin)
+                self.root_to_numpy(hist, rebin, normalize)
             )
 
-            if normalize and np.sum(bin_contents) > 0:
-                norm_factor = 1.0 / np.sum(bin_contents)
-                bin_contents *= norm_factor
-                bin_errors *= norm_factor
+            # if normalize and np.sum(bin_contents) > 0:
+            #     norm_factor = 1.0 / np.sum(bin_contents)
+            #     bin_contents *= norm_factor
+            #     bin_errors *= norm_factor
             
             if args.revert:
                 bin_contents = np.array([1-i if i != 0 else np.nan for i in bin_contents])
@@ -898,14 +905,22 @@ class DQMPlotter:
         has_negative_values = np.any(bin_contents < 0)
         xlabel, ylabel = self._apply_axis_scaling(ax_main, xlabel, ylabel, title, logy, logx, has_negative_values)
 
+        rotation = 45
+        ha = "right"
+        if "KindOfSignalPV" in args.source[0][0]:
+            if rebin != None:
+                bin_labels = ['PV not Reco', 'PV Reco \nas Leading', 'PV Reco \nnot as Leading']
+                rotation = 0
+                ha = "center"
+        
         # Set custom labels if available
         if has_labels:
             ax_main.set_xticks(
                 ref_centers,
                 bin_labels,
-                size="small" if len(bin_labels) < 10 else "xx-small",
-                rotation=45,
-                ha="right",
+                size="small" if len(bin_labels) < 4 else "xx-small",
+                rotation=rotation,
+                ha=ha,
                 va="top",
             )
             ax_main.tick_params(axis="x", which="minor", bottom=False)
@@ -963,9 +978,9 @@ class DQMPlotter:
                 ax_ratio.set_xticks(
                     ref_centers,
                     bin_labels,
-                    size="small" if len(bin_labels) < 10 else "xx-small",
-                    rotation=45,
-                    ha="right",
+                    size="small" if len(bin_labels) < 4 else "xx-small",
+                    rotation=rotation,
+                    ha=ha,
                     va="top",
                 )
                 ax_ratio.tick_params(axis="x", which="minor", bottom=False)
@@ -1218,6 +1233,7 @@ class DQMPlotter:
             hist_name = hist_path.replace("/", "_").replace("\\", "_")
             output_path = os.path.join(output_dir, f"{hist_name}")
 
+        print(f"Output path: {output_path}")
         return output_path
 
     def _create_web_index_files(self, output_dir):
@@ -1385,7 +1401,7 @@ if __name__ == "__main__":
         "-n",
         "--nProcessors",
         type=int,
-        default=None,
+        default=1,
         help="Number of parallel processes to use (default: auto-detect)",
     )
     parser.add_argument(
@@ -1429,9 +1445,9 @@ if __name__ == "__main__":
     rebin = None
     if args.rebin:
         if args.rebin.isdigit():
-            rebin = int(args.rebin)
+            rebin = float(args.rebin)
         else:
-            rebin = [int(x) for x in args.rebin.split(",")]
+            rebin = [float(x) for x in args.rebin.split(",")]
 
     plotter.compare_files(
         file_paths=args.files,
