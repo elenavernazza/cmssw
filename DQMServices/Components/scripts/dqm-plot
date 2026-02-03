@@ -62,8 +62,8 @@ class DQMPlotter:
         self.markers = [
             "o",  # circle
             "s",  # square
-            "^",  # triangle up
             "D",  # diamond
+            "^",  # triangle up
             "v",  # triangle down
             "p",  # pentagon
             "*",  # star
@@ -238,11 +238,16 @@ class DQMPlotter:
             )
 
     def _calculate_and_plot_ratio(self, ax_ratio, bin_centers, bin_contents, bin_errors, bin_edges,
-                                ref_centers, ref_contents, ref_errors, color_idx, plot_histograms):
-        """Calculate and plot ratio between current and reference histogram."""
+        ref_centers, ref_contents, ref_errors, color_idx, plot_histograms, xmin=None, xmax=None):
+        """Calculate and plot ratio between current and reference histogram.
+
+        If xmin/xmax are provided, draw triangles to indicate points fully outside:
+        - (ratio - ratio_err) > xmax  -> triangle-down at y=xmax
+        - (ratio + ratio_err) < xmin  -> triangle-up   at y=xmin
+        """
         if ax_ratio is None:
             return []
-        
+
         tolerance = 1e-6
         matching_indices = []
 
@@ -256,7 +261,7 @@ class DQMPlotter:
 
         curr_idxs, ref_idxs = zip(*matching_indices)
         matching_centers = bin_centers[list(curr_idxs)]
-        
+
         matching_ref_contents = ref_contents[list(ref_idxs)]
         matching_contents = bin_contents[list(curr_idxs)]
         matching_ref_errors = ref_errors[list(ref_idxs)]
@@ -277,33 +282,71 @@ class DQMPlotter:
         )
         ratio_errors = np.nan_to_num(ratio_errors, nan=0.0, posinf=0.0, neginf=0.0)
 
-        if plot_histograms and len(matching_centers) > 1:
-            bin_widths = np.diff(np.sort(matching_centers))
-            avg_width = np.mean(bin_widths)
-            matching_edges = np.concatenate([
-                [matching_centers[0] - avg_width / 2],
-                matching_centers + avg_width / 2,
-            ])
+        use_limits = (xmin is not None) and (xmax is not None)
+        if use_limits:
+            ref_zero = (matching_ref_contents == 0)
+            num_nonzero = (matching_contents != 0)
+            # numerator>0, reference==0 => ratio is undefined/infinite => should be drawn as overflow
+            ref0_numNZ = ref_zero & num_nonzero
+            # both zero => you can treat as "not plottable" (or ratio=0, your choice)
+            ref0_num0 = ref_zero & (~num_nonzero)
+
+            above = ((ratio - ratio_errors) > xmax) | ref0_numNZ  # fully above
+            below = ((ratio + ratio_errors) < xmin) & (~ref0_numNZ) & (~ref0_num0)  # fully below
+            in_range = ~(above | below)
+        else:
+            above = below = None
+            in_range = np.ones_like(ratio, dtype=bool)
+
+        if np.any(in_range):
             ax_ratio.errorbar(
-                matching_centers, ratio, yerr=ratio_errors,
+                matching_centers[in_range],
+                ratio[in_range],
+                yerr=ratio_errors[in_range],
                 color=self.colors[color_idx % len(self.colors)],
                 fmt=self.markers[color_idx % len(self.markers)],
-                markersize=5, capsize=2, linewidth=1.5,
-            )
-            ratio_plus1 = np.append(ratio, ratio[-1])
-            ax_ratio.step(
-                bin_edges, 
-                ratio_plus1, 
-                where="post", 
-                color=self.colors[color_idx % len(self.colors)]
+                markersize=5,
+                capsize=2,
+                linewidth=1.5,
             )
 
-        else:
-            ax_ratio.errorbar(
-                matching_centers, ratio, yerr=ratio_errors,
+        if use_limits:
+            y_offset = 0.03 * (xmax - xmin)
+            # points fully above: triangle-down at y = xmax
+            if np.any(above):
+                ax_ratio.plot(
+                    matching_centers[above],
+                    np.full(np.count_nonzero(above), xmax - y_offset),
+                    linestyle="None",
+                    marker="^",  # triangle-up
+                    markersize=6,
+                    color=self.colors[color_idx % len(self.colors)],
+                )
+
+            # points fully below: triangle-up at y = xmin
+            if np.any(below):
+                ax_ratio.plot(
+                    matching_centers[below],
+                    np.full(np.count_nonzero(below), xmin + y_offset),
+                    linestyle="None",
+                    marker="v",  # triangle-down
+                    markersize=6,
+                    color=self.colors[color_idx % len(self.colors)],
+                )
+
+            ax_ratio.set_ylim(xmin, xmax)
+
+        if plot_histograms and len(matching_centers) > 1:
+            ratio_plus1 = np.append(ratio, ratio[-1])
+
+            if use_limits:
+                ratio_plus1 = np.clip(ratio_plus1, xmin, xmax)
+
+            ax_ratio.step(
+                bin_edges,
+                ratio_plus1,
+                where="post",
                 color=self.colors[color_idx % len(self.colors)],
-                fmt=self.markers[color_idx % len(self.markers)],
-                markersize=5, capsize=2, linewidth=1.5,
             )
 
         return ratio[(ratio > 0) & np.isfinite(ratio)]
@@ -381,7 +424,7 @@ class DQMPlotter:
             or (len(wrapped_labels) > 8 and max_label_length > 20)
         )
 
-        legend_columns = 1 if len(wrapped_labels) <= 2 else 3
+        legend_columns = 1 if len(wrapped_labels) < 2 else 3
         legend_fontsize = "20"
         legend_title_fontsize = "20"
         if len(wrapped_labels) > 6:
@@ -851,7 +894,7 @@ class DQMPlotter:
                 # Default energy text (13 TeV)
                 hep.cms.label(cms_text, data=data, ax=ax_main)
             else:
-                hep.cms.label(cms_text, data=data, ax=ax_main, rlabel=energy_text)
+                hep.cms.label(cms_text, data=data, ax=ax_main, rlabel=fr'${energy_text}$')
         else:
             hep.cms.label(cms_text, data=data, ax=ax_main, rlabel="")
 
@@ -892,7 +935,9 @@ class DQMPlotter:
             if i > 0:
                 valid_ratios = self._calculate_and_plot_ratio(
                     ax_ratio, bin_centers, bin_contents, bin_errors, bin_edges,
-                    ref_centers, ref_contents, ref_errors, i, plot_histograms
+                    ref_centers, ref_contents, ref_errors, i, plot_histograms,
+                    xmin=float(args.ylim_ratio.split(',')[0]) if args.ylim_ratio else None,
+                    xmax=float(args.ylim_ratio.split(',')[1]) if args.ylim_ratio else None,
                 )
                 all_ratios.extend(valid_ratios)
 

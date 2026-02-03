@@ -790,7 +790,7 @@ class DQMPlotter:
                 # Default energy text (13 TeV)
                 hep.cms.label(cms_text, data=data, ax=ax_main)
             else:
-                hep.cms.label(cms_text, data=data, ax=ax_main, rlabel=energy_text)
+                hep.cms.label(cms_text, data=data, ax=ax_main, rlabel=fr'${energy_text}$')
         else:
             hep.cms.label(cms_text, data=data, ax=ax_main, rlabel="")
 
