@@ -46,7 +46,36 @@ hltJetPostProcessor = DQMEDHarvester("DQMGenericClient",
         "DupGen_vs_Pt_E 'Duplicate Gen Rate vs p_{T} - Endcap' DuplicatesGenPt_E GenPt_E",
         "DupGen_vs_Pt_F 'Duplicate Gen Rate vs p_{T} - Forward' DuplicatesGenPt_F GenPt_F",
     ),
-    resolution = cms.vstring(),
+    resolution = cms.vstring(
+        # Response Reco Over Gen
+        "ResFit_RecoOverGen_GenEta 'Response RecoOverGen vs #eta^{gen}' h2d_PtRecoOverGen_GenEta fit",
+        "ResFit_RecoOverGen_GenPhi 'Response RecoOverGen vs #phi^{gen}' h2d_PtRecoOverGen_GenPhi fit",
+        "ResFit_RecoOverGen_GenPt 'Response RecoOverGen vs p_{T}^{gen}' h2d_PtRecoOverGen_GenPt fit",
+        "ResFit_RecoOverGen_GenPt_B 'Response RecoOverGen vs p_{T}^{gen} - Barrel' h2d_PtRecoOverGen_GenPt_B fit",
+        "ResFit_RecoOverGen_GenPt_E 'Response RecoOverGen vs p_{T}^{gen} - Endcap' h2d_PtRecoOverGen_GenPt_E fit",
+        "ResFit_RecoOverGen_GenPt_F 'Response RecoOverGen vs p_{T}^{gen} - Forward' h2d_PtRecoOverGen_GenPt_F fit",
+        # Response Corr Over Gen
+        "ResFit_CorrOverGen_GenEta 'Response CorrOverGen vs #eta^{gen}' h2d_PtCorrOverGen_GenEta fit",
+        "ResFit_CorrOverGen_GenPhi 'Response CorrOverGen vs #phi^{gen}' h2d_PtCorrOverGen_GenPhi fit",
+        "ResFit_CorrOverGen_GenPt 'Response CorrOverGen vs p_{T}^{gen}' h2d_PtCorrOverGen_GenPt fit",
+        "ResFit_CorrOverGen_GenPt_B 'Response CorrOverGen vs p_{T}^{gen} - Barrel' h2d_PtCorrOverGen_GenPt_B fit",
+        "ResFit_CorrOverGen_GenPt_E 'Response CorrOverGen vs p_{T}^{gen} - Endcap' h2d_PtCorrOverGen_GenPt_E fit",
+        "ResFit_CorrOverGen_GenPt_F 'Response CorrOverGen vs p_{T}^{gen} - Forward' h2d_PtCorrOverGen_GenPt_F fit",
+        # Response Corr Over Reco
+        "ResFit_CorrOverReco_Eta 'Response CorrOverReco vs #eta^{reco}' h2d_PtCorrOverReco_Eta fit",
+        "ResFit_CorrOverReco_Phi 'Response CorrOverReco vs #phi^{reco}' h2d_PtCorrOverReco_Phi fit",
+        "ResFit_CorrOverReco_Pt 'Response CorrOverReco vs p_{T}^{reco}' h2d_PtCorrOverReco_Pt fit",
+        "ResFit_CorrOverReco_Pt_E 'Response CorrOverReco vs p_{T}^{reco} - Endcap' h2d_PtCorrOverReco_Pt_E fit",
+        "ResFit_CorrOverReco_Pt_B 'Response CorrOverReco vs p_{T}^{reco} - Barrel' h2d_PtCorrOverReco_Pt_B fit",
+        "ResFit_CorrOverReco_Pt_F 'Response CorrOverReco vs p_{T}^{reco} - Forward' h2d_PtCorrOverReco_Pt_F fit",
+        # DeltaR distance
+        "DeltaRFit_Eta '#DeltaR distance vs #eta^{reco}' h2d_DeltaR_Eta fit",
+        "DeltaRFit_Phi '#DeltaR distance vs #phi^{reco}' h2d_DeltaR_Phi fit",
+        "DeltaRFit_Pt '#DeltaR distance vs p_{T}^{reco}' h2d_DeltaR_Pt fit",
+        "DeltaRFit_GenEta '#DeltaR distance vs #eta^{gen}' h2d_DeltaR_GenEta fit",
+        "DeltaRFit_GenPhi '#DeltaR distance vs #phi^{gen}' h2d_DeltaR_GenPhi fit",
+        "DeltaRFit_GenPt '#DeltaR distance vs p_{T}^{gen}' h2d_DeltaR_GenPt fit",
+    ),
     resolutionProfile = cms.untracked.vstring(
         # Response Reco Over Gen
         "Res_RecoOverGen_GenEta 'Response RecoOverGen vs #eta^{gen}' h2d_PtRecoOverGen_GenEta rms",
