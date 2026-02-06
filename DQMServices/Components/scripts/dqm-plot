@@ -51,8 +51,8 @@ class DQMPlotter:
             "#3f8fda",
             "#ffa90e",
             "#bd1f01",
-            "#94a4a2",
             "#832db6",
+            "#94a4a2",
             "#a96b59",
             "#e76300",
             "#b9ac70",
@@ -63,9 +63,9 @@ class DQMPlotter:
             "o",  # circle
             "s",  # square
             "D",  # diamond
+            "p",  # pentagon
             "^",  # triangle up
             "v",  # triangle down
-            "p",  # pentagon
             "*",  # star
             "h",  # hexagon
             "<",  # triangle left
@@ -94,6 +94,43 @@ class DQMPlotter:
 
         self.colors.extend(new_colors)
 
+    def _as_profile(self, hist, name_suffix="_prof"):
+
+        if isinstance(hist, ROOT.TH1):
+            xaxis = hist.GetXaxis()
+            n = hist.GetNbinsX()
+
+            # Create empty profile with same binning
+            # Variable binning:
+            edges = [xaxis.GetBinLowEdge(1)]
+            for i in range(2, n + 2):
+                edges.append(xaxis.GetBinLowEdge(i))
+            edges_arr = array.array('d', edges)
+
+            prof = ROOT.TProfile(hist.GetName() + name_suffix, hist.GetTitle(), n, edges_arr)
+            prof.Sumw2()
+
+            # Approximate: fill each bin center with y=bin_content repeated "entries" times
+            # If entries are not meaningful, this will not be meaningful either.
+            for i in range(1, n + 1):
+                x = xaxis.GetBinCenter(i)
+                y = hist.GetBinContent(i)
+                yerr = hist.GetBinError(i)
+                # Fill entries times (can be slow if huge; see note below)
+                N = 1
+                sumY  = N * y
+                sumY2 = N * (y*y + (yerr*yerr)*N)
+
+                prof.SetBinEntries(i, N)
+                prof.SetBinContent(i, sumY)
+                prof.GetSumw2()[i] = sumY2
+                # prof.SetBinError(i, 1 * (y*y + (yerr*yerr)*1))
+                # print(i, y, yerr, prof.GetBinError(i))
+
+            return prof
+        else:
+            return hist
+
     def root_to_numpy(self, hist, rebin=None, normalize=False):
         """
         Convert ROOT histogram to numpy arrays.
@@ -105,7 +142,11 @@ class DQMPlotter:
             tuple: (bin_centers, bin_contents, bin_errors, bin_edges, bin_labels, has_labels)
         """
 
+        n_bins = hist.GetNbinsX()
+        # print("Before: ", np.array([hist.GetBinLowEdge(i) for i in range(1, n_bins + 2)]))
         if rebin is not None:
+            # [FIXME] Check if it's not a real distribution before converting
+            hist = self._as_profile(hist)  # Convert to TProfile for more meaningful rebinning if entries are available
             if isinstance(rebin, (int, float)):
                 hist = hist.Rebin(int(rebin), hist.GetName() + "_rebin")
             elif hasattr(rebin, '__iter__'):
@@ -133,6 +174,7 @@ class DQMPlotter:
         
         # Only use extracted labels if meaningful
         has_labels = any(label and not label.isdigit() for label in bin_labels)
+        # print("After: ", np.array([hist.GetBinLowEdge(i) for i in range(1, n_bins + 2)]))
 
         return bin_centers, bin_contents, bin_errors, bin_edges, bin_labels, has_labels
 
@@ -162,7 +204,7 @@ class DQMPlotter:
             
             if "vertpos" in xlabel:
                 ax.set_xscale("log")
-                xlabel = "vert r [cm]"
+                xlabel = "vertex r [cm]"
 
             if logx:
                 ax.set_xscale("log")
@@ -351,7 +393,7 @@ class DQMPlotter:
 
         return ratio[(ratio > 0) & np.isfinite(ratio)]
 
-    def _wrap_legend_labels(self, labels, width=25):
+    def _wrap_legend_labels(self, labels, width=30):
         """Soft-wrap legend labels at natural break points to reduce horizontal size."""
         wrapped = []
         for lab in labels:
@@ -420,16 +462,16 @@ class DQMPlotter:
 
         place_outside = (
             force_outside
-            or max_label_length > 30
+            or max_label_length > 40
             or (len(wrapped_labels) > 8 and max_label_length > 20)
         )
 
-        legend_columns = 1 if len(wrapped_labels) < 2 else 3
+        legend_columns = len(wrapped_labels) if len(wrapped_labels) <= 4 else 2
         legend_fontsize = "20"
         legend_title_fontsize = "20"
-        if len(wrapped_labels) > 6:
-            legend_fontsize = "18"
-            legend_title_fontsize = "18"
+        if len(wrapped_labels) > 3:
+            legend_fontsize = "16"
+            legend_title_fontsize = "20"
         if len(wrapped_labels) > 10:
             legend_fontsize = "16"
             legend_title_fontsize = "16"
@@ -559,7 +601,10 @@ class DQMPlotter:
 
             if "#sigma(" in title.lower():
                 core = left[left.find("(") + 1 : left.rfind(")")]
-                ylabel = r"$\delta$" + core + "/" + core
+                if "d_{z}" not in title.lower() and "d_{xy}" not in title.lower():
+                    ylabel = r"$\delta$" + core + "/" + core
+                else:
+                    ylabel = r"$\delta$" + core
                 right_clean = right
                 if "Mean" in title:
                     ylabel = "<" + ylabel + ">"
@@ -648,6 +693,7 @@ class DQMPlotter:
             ("number of", "#"),
             ("Number of", "#"),
             ("Response RecoOverGen", r"$p_{\mathrm{T}}^{\mathrm{reco}}/p_{\mathrm{T}}^{\mathrm{gen}}$"),
+            ("Response CorrOverGen", r"$p_{\mathrm{T}}^{\mathrm{corr}}/p_{\mathrm{T}}^{\mathrm{gen}}$"),
         ]
         if units == True:
             conversions.insert(0,("Z", r"$\mathrm{z}$ [cm]"))

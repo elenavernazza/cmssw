@@ -94,7 +94,44 @@ class DQMPlotter:
 
         self.colors.extend(new_colors)
 
-    def root_to_numpy(self, hist):
+    def _as_profile(self, hist, name_suffix="_prof"):
+
+        if isinstance(hist, ROOT.TH1):
+            xaxis = hist.GetXaxis()
+            n = hist.GetNbinsX()
+
+            # Create empty profile with same binning
+            # Variable binning:
+            edges = [xaxis.GetBinLowEdge(1)]
+            for i in range(2, n + 2):
+                edges.append(xaxis.GetBinLowEdge(i))
+            edges_arr = array.array('d', edges)
+
+            prof = ROOT.TProfile(hist.GetName() + name_suffix, hist.GetTitle(), n, edges_arr)
+            prof.Sumw2()
+
+            # Approximate: fill each bin center with y=bin_content repeated "entries" times
+            # If entries are not meaningful, this will not be meaningful either.
+            for i in range(1, n + 1):
+                x = xaxis.GetBinCenter(i)
+                y = hist.GetBinContent(i)
+                yerr = hist.GetBinError(i)
+                # Fill entries times (can be slow if huge; see note below)
+                N = 1
+                sumY  = N * y
+                sumY2 = N * (y*y + (yerr*yerr)*N)
+
+                prof.SetBinEntries(i, N)
+                prof.SetBinContent(i, sumY)
+                prof.GetSumw2()[i] = sumY2
+                # prof.SetBinError(i, 1 * (y*y + (yerr*yerr)*1))
+                # print(i, y, yerr, prof.GetBinError(i))
+
+            return prof
+        else:
+            return hist
+
+    def root_to_numpy(self, hist, rebin=None, normalize=False):
         """
         Convert ROOT histogram to numpy arrays.
 
@@ -106,8 +143,24 @@ class DQMPlotter:
         """
 
         n_bins = hist.GetNbinsX()
+        # print("Before: ", np.array([hist.GetBinLowEdge(i) for i in range(1, n_bins + 2)]))
+        if rebin is not None:
+            hist = self._as_profile(hist)  # Convert to TProfile for more meaningful rebinning if entries are available
+            if isinstance(rebin, (int, float)):
+                hist = hist.Rebin(int(rebin), hist.GetName() + "_rebin")
+            elif hasattr(rebin, '__iter__'):
+                bin_edges_c = array.array('d', rebin)
+                hist = hist.Rebin(len(bin_edges_c) - 1,  hist.GetName() + "_rebin", bin_edges_c)
+            else:
+                raise ValueError(f"Unknown type for rebin: {type(rebin)}")
+        
+        if normalize:
+            integral = hist.Integral()
+            if integral > 0:
+                hist.Scale(1.0 / integral)
+
+        n_bins = hist.GetNbinsX()
         bin_edges = np.array([hist.GetBinLowEdge(i) for i in range(1, n_bins + 2)])
-        # print("bin_edges:", bin_edges)
         bin_centers = np.array([hist.GetBinCenter(i) for i in range(1, n_bins + 1)])
 
         bin_contents = np.array([hist.GetBinContent(i) for i in range(1, n_bins + 1)])
@@ -120,9 +173,7 @@ class DQMPlotter:
         
         # Only use extracted labels if meaningful
         has_labels = any(label and not label.isdigit() for label in bin_labels)
-
-        # for ibin in range(n_bins):
-        #     print(f"Bin {ibin+1}: Edge=({bin_edges[ibin]}, {bin_edges[ibin+1]}), Center={bin_centers[ibin]}, Content={bin_contents[ibin]}, Error={bin_errors[ibin]}, Label='{bin_labels[ibin]}'")
+        # print("After: ", np.array([hist.GetBinLowEdge(i) for i in range(1, n_bins + 2)]))
 
         return bin_centers, bin_contents, bin_errors, bin_edges, bin_labels, has_labels
 
@@ -485,7 +536,7 @@ class DQMPlotter:
                 left = left.replace("_", " ")
                 right = right.replace("_", " ")
 
-            ylabel = r"$\sigma$<" + left + ">" + "/<" + left + ">"
+            ylabel = r"$\sigma$(" + left + ")" + "/<" + left + ">"
             right_clean = right.replace("Sigma", "")
             xlabel = right_clean.strip()
 
@@ -553,6 +604,7 @@ class DQMPlotter:
             ("number of", "#"),
             ("Number of", "#"),
             ("Response RecoOverGen", r"$p_{\mathrm{T}}^{\mathrm{reco}}/p_{\mathrm{T}}^{\mathrm{gen}}$"),
+            ("Response CorrOverGen", r"$p_{\mathrm{T}}^{\mathrm{corr}}/p_{\mathrm{T}}^{\mathrm{gen}}$"),
         ]
 
         result = text
@@ -810,13 +862,13 @@ class DQMPlotter:
         
         for i, (hist, label) in enumerate(zip(histograms, labels)):
             bin_centers, bin_contents, bin_errors, bin_edges, bin_labels, has_labels = (
-                self.root_to_numpy(hist)
+                self.root_to_numpy(hist, rebin, normalize)
             )
 
-            if normalize and np.sum(bin_contents) > 0:
-                norm_factor = 1.0 / np.sum(bin_contents)
-                bin_contents *= norm_factor
-                bin_errors *= norm_factor
+            # if normalize and np.sum(bin_contents) > 0:
+            #     norm_factor = 1.0 / np.sum(bin_contents)
+            #     bin_contents *= norm_factor
+            #     bin_errors *= norm_factor
             
             if args.revert:
                 bin_contents = 1. - bin_contents
@@ -1249,17 +1301,6 @@ def process_histogram_task(task):
                     f"N [{num.GetXaxis().GetXmin()},{num.GetXaxis().GetXmax()}] "
                     f"vs D [{den.GetXaxis().GetXmin()},{den.GetXaxis().GetXmax()}]"
                 )
-
-            if rebin is not None:
-                if isinstance(rebin, (int, float)):
-                    num = num.Rebin(int(rebin), num.GetName() + "_rebin")
-                    den = den.Rebin(int(rebin), den.GetName() + "_rebin")
-                elif hasattr(rebin, '__iter__'):
-                    bin_edges_c = array.array('d', rebin)
-                    num = num.Rebin(len(bin_edges_c) - 1,  num.GetName() + "_rebin", bin_edges_c)
-                    den = den.Rebin(len(bin_edges_c) - 1,  den.GetName() + "_rebin", bin_edges_c)
-                else:
-                    raise ValueError(f"Unknown type for rebin: {type(rebin)}")
                 
             # Build ratio
             xax = num.GetXaxis()
