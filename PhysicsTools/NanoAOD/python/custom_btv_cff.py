@@ -60,12 +60,108 @@ def update_jets_AK4(process):
     process.load("Configuration.StandardSequences.MagneticField_cff")
     process.jetPuppiCorrFactorsNano.src = "selectedUpdatedPatJetsPuppiWithDeepInfo"
     process.updatedJetsPuppi.jetSource = "selectedUpdatedPatJetsPuppiWithDeepInfo"
-    
+
+    process.pfMyUnifiedParticleTransformerAK4TagInfosPuppiWithDeepInfo = (
+        process.pfUnifiedParticleTransformerAK4TagInfosPuppiWithDeepInfo.clone()
+    )
+
+    process.pfMyUnifiedParticleTransformerAK4JetTagsPuppiWithDeepInfo = cms.EDProducer(
+        "BHiveUnifiedParticleTransformerAK4ONNXJetTagsProducer",
+        src = cms.InputTag("pfMyUnifiedParticleTransformerAK4TagInfosPuppiWithDeepInfo"),
+        input_names = cms.vstring("input_1", "input_2", "input_3", "input_4", "input_5"),
+        model_path = cms.FileInPath("RecoBTag/Combined/data/UParTAK4/PUPPI/BsTauTau/part_run3_bstautau_btag_edge_sumref.onnx"),
+        output_names = cms.vstring("output"),
+        flav_names = cms.vstring(
+            "b",
+            "lepb",
+            "c",
+            "uds",
+            "g",
+            "ditauh",
+            "ditaumu",
+            "ditaue",
+        ),
+    )
+
+    def _vinput_sum(*groups):
+        return cms.VInputTag(*[tag for group in groups for tag in group])
+
+    process.pfMyUnifiedParticleTransformerAK4DiscriminatorsJetTagsPuppiWithDeepInfo = cms.EDProducer(
+        "BTagProbabilityToDiscriminator",
+        discriminators = cms.VPSet(
+            cms.PSet(
+                name = cms.string("tauhtauh"),
+                numerator = cms.VInputTag(
+                    cms.InputTag("pfMyUnifiedParticleTransformerAK4JetTagsPuppiWithDeepInfo", "ditauh"),
+                ),
+                denominator = cms.VInputTag(),
+            ),
+            cms.PSet(
+                name = cms.string("tauhtaue"),
+                numerator = cms.VInputTag(
+                    cms.InputTag("pfMyUnifiedParticleTransformerAK4JetTagsPuppiWithDeepInfo", "ditaue"),
+                ),
+                denominator = cms.VInputTag(),
+            ),
+            cms.PSet(
+                name = cms.string("tauhtaumu"),
+                numerator = cms.VInputTag(
+                    cms.InputTag("pfMyUnifiedParticleTransformerAK4JetTagsPuppiWithDeepInfo", "ditaumu"),
+                ),
+                denominator = cms.VInputTag(),
+            ),
+            cms.PSet(
+                name = cms.string("probb"),
+                numerator = cms.VInputTag(
+                    cms.InputTag("pfMyUnifiedParticleTransformerAK4JetTagsPuppiWithDeepInfo", "b"),
+                    cms.InputTag("pfMyUnifiedParticleTransformerAK4JetTagsPuppiWithDeepInfo", "lepb"),
+                ),
+                denominator = cms.VInputTag(),
+            ),
+            cms.PSet(
+                name = cms.string("probc"),
+                numerator = cms.VInputTag(
+                    cms.InputTag("pfMyUnifiedParticleTransformerAK4JetTagsPuppiWithDeepInfo", "c"),
+                ),
+                denominator = cms.VInputTag(),
+            ),
+            cms.PSet(
+                name = cms.string("probother"),
+                numerator = cms.VInputTag(
+                    cms.InputTag("pfMyUnifiedParticleTransformerAK4JetTagsPuppiWithDeepInfo", "uds"),
+                    cms.InputTag("pfMyUnifiedParticleTransformerAK4JetTagsPuppiWithDeepInfo", "g"),
+                ),
+                denominator = cms.VInputTag(),
+            ),
+        ),
+    )
+
+    getPatAlgosToolsTask(process).add(
+        process.pfMyUnifiedParticleTransformerAK4TagInfosPuppiWithDeepInfo,
+        process.pfMyUnifiedParticleTransformerAK4JetTagsPuppiWithDeepInfo,
+        process.pfMyUnifiedParticleTransformerAK4DiscriminatorsJetTagsPuppiWithDeepInfo,
+    )
     
     process.updatedPatJetsTransientCorrectedPuppiWithDeepInfo.tagInfoSources.append(cms.InputTag("pfDeepFlavourTagInfosPuppiWithDeepInfo"))
     process.updatedPatJetsTransientCorrectedPuppiWithDeepInfo.tagInfoSources.append(cms.InputTag("pfUnifiedParticleTransformerAK4TagInfosPuppiWithDeepInfo"))
     process.updatedPatJetsTransientCorrectedPuppiWithDeepInfo.addTagInfos = cms.bool(True)
 
+    flavs = process.pfMyUnifiedParticleTransformerAK4JetTagsPuppiWithDeepInfo.flav_names
+
+    process.updatedPatJetsTransientCorrectedPuppiWithDeepInfo.discriminatorSources += cms.VInputTag(
+        *[cms.InputTag("pfMyUnifiedParticleTransformerAK4JetTagsPuppiWithDeepInfo", flav) for flav in flavs],
+        cms.InputTag("pfMyUnifiedParticleTransformerAK4DiscriminatorsJetTagsPuppiWithDeepInfo", "tauhtauh"),
+        cms.InputTag("pfMyUnifiedParticleTransformerAK4DiscriminatorsJetTagsPuppiWithDeepInfo", "tauhtaumu"),
+        cms.InputTag("pfMyUnifiedParticleTransformerAK4DiscriminatorsJetTagsPuppiWithDeepInfo", "tauhtaue"),
+        cms.InputTag("pfMyUnifiedParticleTransformerAK4DiscriminatorsJetTagsPuppiWithDeepInfo", "probb"),
+        cms.InputTag("pfMyUnifiedParticleTransformerAK4DiscriminatorsJetTagsPuppiWithDeepInfo", "probc"),
+        cms.InputTag("pfMyUnifiedParticleTransformerAK4DiscriminatorsJetTagsPuppiWithDeepInfo", "probother"),
+    )
+
+    process.updatedPatJetsTransientCorrectedPuppiWithDeepInfo.tagInfoSources.append(
+        cms.InputTag("pfMyUnifiedParticleTransformerAK4TagInfosPuppiWithDeepInfo")
+    )
+    
     # Fix ParticleNetFromMiniAOD input when slimmedTaus is updated
     from PhysicsTools.NanoAOD.nano_cff import _fixPNetInputCollection
     (run2_nanoAOD_106Xv2 | run3_nanoAOD_pre142X | nanoAOD_rePuppi).toModify(

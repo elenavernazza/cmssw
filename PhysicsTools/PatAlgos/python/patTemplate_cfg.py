@@ -35,5 +35,9 @@ process.out = cms.OutputModule("PoolOutputModule",
                                outputCommands = cms.untracked.vstring('drop *', *patEventContentNoCleaning )
                                )
 
-patAlgosToolsTask = getPatAlgosToolsTask(process)
+patAlgosToolsTask = getPatAlgosToolsTask(process).add(
+        process.pfMyUnifiedParticleTransformerAK4TagInfosPuppiWithDeepInfo,
+        process.pfMyUnifiedParticleTransformerAK4JetTagsPuppiWithDeepInfo,
+        process.pfMyUnifiedParticleTransformerAK4DiscriminatorsJetTagsPuppiWithDeepInfo,
+    )
 process.outpath = cms.EndPath(process.out, patAlgosToolsTask)
