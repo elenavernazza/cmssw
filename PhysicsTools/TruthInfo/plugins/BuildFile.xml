@@ -51,6 +51,7 @@
 <use name="SimGeneral/MixingModule"/>
 
 <use name="DQMServices/Core"/>
+<use name="CommonTools/UtilAlgos"/>
 <use name="SimDataFormats/Associations"/>
 
 <library file="AllTracksterToTruthBranchAssociatorsProducer.cc" name="AllTracksterToTruthBranchAssociatorsPlugins">
@@ -62,6 +63,10 @@
 </library>
 
 <library file="AdaptiveAssociationDumper.cc" name="AdaptiveAssociationDumperPlugins">
+  <flags EDM_PLUGIN="1"/>
+</library>
+
+<library file="MyTruthAnalyzer.cc" name="MyTruthAnalyzerPlugins">
   <flags EDM_PLUGIN="1"/>
 </library>
 
