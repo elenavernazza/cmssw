@@ -7,7 +7,7 @@ process.load("FWCore.MessageService.MessageLogger_cfi")
 process.load("Validation.Configuration.truthPrevalidation_cff")
 
 process.maxEvents = cms.untracked.PSet(
-    input=cms.untracked.int32(-1)
+    input=cms.untracked.int32(100)
 )
 
 process.source = cms.Source(
@@ -28,6 +28,7 @@ process.myTruthAnalyzer = cms.EDAnalyzer(
     "MyTruthAnalyzer",
     src = cms.InputTag("truthLogicalGraphProducer"),
     hitIndex = cms.InputTag("truthLogicalGraphHitIndexProducer"),
+    recHitMap = cms.InputTag("detIdToRecHitMapProducer"),
     doTenTau = cms.bool(True),
     doDYtoLL = cms.bool(False),
 )

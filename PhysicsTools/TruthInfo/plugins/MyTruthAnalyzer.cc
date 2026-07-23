@@ -24,6 +24,7 @@
 
 #include "SimDataFormats/TruthInfo/interface/Graph.h"
 #include "SimDataFormats/TruthInfo/interface/LogicalGraphHitIndex.h"
+#include "SimCalorimetry/HGCalAssociatorProducers/interface/DetIdRecHitMap.h"
 
 class MyTruthAnalyzer : public edm::one::EDAnalyzer<> {
 public:
@@ -42,6 +43,7 @@ private:
     
     const edm::EDGetTokenT<truth::Graph> graphToken_;
     const edm::EDGetTokenT<truth::LogicalGraphHitIndex> hitIndexToken_;
+    const edm::EDGetTokenT<hgcal::DetIdRecHitMap> recHitMapToken_;
 
     bool doTenTau, doDYtoLL;
     
@@ -59,6 +61,7 @@ MyTruthAnalyzer::MyTruthAnalyzer(edm::ParameterSet const& cfg)
         : histContainer_(),
           graphToken_(consumes<truth::Graph>(cfg.getParameter<edm::InputTag>("src"))),
           hitIndexToken_(consumes<truth::LogicalGraphHitIndex>(cfg.getParameter<edm::InputTag>("hitIndex"))),
+          recHitMapToken_(consumes<hgcal::DetIdRecHitMap>(cfg.getParameter<edm::InputTag>("recHitMap"))),
           doTenTau(cfg.getParameter<bool>("doTenTau")),
           doDYtoLL(cfg.getParameter<bool>("doDYtoLL")){}
 
@@ -123,7 +126,8 @@ void MyTruthAnalyzer::beginJob() {
         histContainer_["SimEleEta"] = fs->make<TH1F>("SimEleEta", "SimEleEta", 100, -5, 5);
 
         //Total RecHit energy
-        //histContainer_["TauRecHitE"] = fs->make<TH1F>("TauRecHitE", "TauRecHitE", 1000, 0, 500);
+        histContainer_["TauRecHitE"] = fs->make<TH1F>("TauRecHitE", "TauRecHitE", 1000, 0, 500);
+        histContainer_["TauEResponse"] = fs->make<TH1F>("TauEResponse", "TauEResponse", 1000, 0, 10);
     }
 
     if(doDYtoLL)
@@ -147,6 +151,7 @@ void MyTruthAnalyzer::analyze(edm::Event const& event, edm::EventSetup const&) {
         //truth graph collection
         auto const& graph = event.get(graphToken_);
         auto const& hitIndex  = event.get(hitIndexToken_);
+        auto const& recHitMap = event.get(recHitMapToken_);
         using truth::HitChannel;
 
     if(doTenTau)
@@ -180,12 +185,14 @@ void MyTruthAnalyzer::analyze(edm::Event const& event, edm::EventSetup const&) {
             //radial distance of tau decay vertex
             if(std::abs(p.pdgId()) == 15 && p.hasGen())
             {
+                auto produceVertices = p.productionVertices();
                 auto decayVertices = p.decayVertices();
-                for(const auto& vtx : decayVertices)
+                if(produceVertices.size() == 1 && decayVertices.size() == 1)
                 {
-                    if(!vtx.valid()) continue;
-                    auto pos = vtx.position();
-                    double r = std::sqrt(pos.x()*pos.x() + pos.y()*pos.y());
+                    if(!produceVertices[0].valid() || !decayVertices[0].valid()) continue;
+                    auto producepos = produceVertices[0].position();
+                    auto decaypos = decayVertices[0].position();
+                    double r = std::hypot(producepos.x()-decaypos.x(), producepos.y()-decaypos.y());
                     histContainer_["TauDecayVtxRadius"]->Fill(r);
                 }
             }
@@ -323,7 +330,7 @@ void MyTruthAnalyzer::analyze(edm::Event const& event, edm::EventSetup const&) {
         histContainer_["TruthEleNum"]->Fill(nTruthEle);
 
         //hitIndex
-        /*for (uint32_t pid = 0; pid < hitIndex.nParticles(); ++pid)
+        for (uint32_t pid = 0; pid < hitIndex.nParticles(); ++pid)
         {
             auto const& p = graph.particle(pid);
             if (std::abs(p.pdgId()) != 15)
@@ -332,15 +339,20 @@ void MyTruthAnalyzer::analyze(edm::Event const& event, edm::EventSetup const&) {
             float Energy = 0.f;
             for (auto const& h : subgraph)
             {
-                //Energy = Energy + h.energy;
+                Energy = Energy + h.energy;
                 if (h.hasRecHit())
                 {
                     auto idx = h.recHitIndex;
-                    Energy = Energy + idx.energy;
                 }
             }
             histContainer_["TauRecHitE"]->Fill(Energy);
-        }*/
+            histContainer_["TauEResponse"]->Fill(Energy/(p.momentum().energy()));
+
+            edm::Handle<hgcal::DetIdRecHitMap> hRecHitMap;
+            event.getByToken(recHitMapToken_, hRecHitMap);
+            if (hRecHitMap.isValid()) std::cout << "hRecHitMap is valid" << std::endl;
+            //auto const* recHitMap = hRecHitMap.isValid() ? &(*hRecHitMap) : nullptr;
+        }
 
 
    }//doTenTau
