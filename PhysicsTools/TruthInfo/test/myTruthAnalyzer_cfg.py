@@ -29,6 +29,12 @@ process.myTruthAnalyzer = cms.EDAnalyzer(
     src = cms.InputTag("truthLogicalGraphProducer"),
     hitIndex = cms.InputTag("truthLogicalGraphHitIndexProducer"),
     recHitMap = cms.InputTag("detIdToRecHitMapProducer"),
+    hgcalRecHits = cms.VInputTag(
+        cms.InputTag("HGCalRecHit", "HGCEERecHits"),
+        cms.InputTag("HGCalRecHit", "HGCHEFRecHits"),
+        cms.InputTag("HGCalRecHit", "HGCHEBRecHits"),
+    ),
+    #hgcalRecHits = cms.InputTag("HGCalRecHit", "HGCEERecHits"),
     doTenTau = cms.bool(True),
     doDYtoLL = cms.bool(False),
 )
