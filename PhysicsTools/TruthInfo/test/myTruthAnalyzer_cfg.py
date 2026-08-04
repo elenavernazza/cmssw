@@ -5,6 +5,7 @@ process = cms.Process("MYTRUTHANALYZER")
 # Messages
 process.load("FWCore.MessageService.MessageLogger_cfi")
 process.load("Validation.Configuration.truthPrevalidation_cff")
+process.load("Configuration.Geometry.GeometryExtendedRun4D122Reco_cff")
 
 process.maxEvents = cms.untracked.PSet(
     input=cms.untracked.int32(100)
@@ -13,7 +14,7 @@ process.maxEvents = cms.untracked.PSet(
 process.source = cms.Source(
     "PoolSource",
     fileNames=cms.untracked.vstring(
-        "file:34087.88_TenTau_15_500+Run4D120_enableTruth/step3.root"
+        "file:step3.root"
         #"file:34044.88_DYToLL_M_50_14TeV+Run4D120_enableTruth/step3.root"
     )
 )
@@ -34,7 +35,14 @@ process.myTruthAnalyzer = cms.EDAnalyzer(
         cms.InputTag("HGCalRecHit", "HGCHEFRecHits"),
         cms.InputTag("HGCalRecHit", "HGCHEBRecHits"),
     ),
-    #hgcalRecHits = cms.InputTag("HGCalRecHit", "HGCEERecHits"),
+    # These must follow the HGC collections and match exactly the PFRecHit
+    # ordering configured in detIdToRecHitMapProducer.
+    pfRecHits = cms.VInputTag(
+        cms.InputTag("particleFlowRecHitECAL", "Cleaned"),
+        cms.InputTag("particleFlowRecHitHBHE", "Cleaned"),
+        cms.InputTag("particleFlowRecHitHF", "Cleaned"),
+        cms.InputTag("particleFlowRecHitHO", "Cleaned"),
+    ),
     doTenTau = cms.bool(True),
     doDYtoLL = cms.bool(False),
 )

@@ -21,11 +21,14 @@
 #include "FWCore/ServiceRegistry/interface/Service.h"
 #include "CommonTools/UtilAlgos/interface/TFileService.h"
 #include "TH1.h"
+#include "TH2.h"
 
 #include "SimDataFormats/TruthInfo/interface/Graph.h"
 #include "SimDataFormats/TruthInfo/interface/LogicalGraphHitIndex.h"
+#include "PhysicsTools/TruthInfo/interface/SubgraphHitView.h"
 #include "SimCalorimetry/HGCalAssociatorProducers/interface/DetIdRecHitMap.h"
 #include "DataFormats/HGCRecHit/interface/HGCRecHitCollections.h"
+#include "DataFormats/ParticleFlowReco/interface/PFRecHit.h"
 
 class MyTruthAnalyzer : public edm::one::EDAnalyzer<> {
 public:
@@ -41,6 +44,7 @@ private:
     //simple map to contain all histograms
     //booked in the beginJob, filled in the analyze
     std::map<std::string, TH1F*> histContainer_;
+    std::map<std::string, TH2F*> histContainer2D_;
     
     const edm::EDGetTokenT<truth::Graph> graphToken_;
     const edm::EDGetTokenT<truth::LogicalGraphHitIndex> hitIndexToken_;
@@ -49,6 +53,7 @@ private:
     bool doTenTau, doDYtoLL;
 
     std::vector<edm::EDGetTokenT<HGCRecHitCollection>> hgcalRecHitsToken_;
+    std::vector<edm::EDGetTokenT<reco::PFRecHitCollection>> pfRecHitsToken_;
     
     //tentau
     mutable int totTau = 0, totTauToMu = 0, totTauToEle = 0, totTauToHadron = 0;
@@ -73,6 +78,11 @@ MyTruthAnalyzer::MyTruthAnalyzer(edm::ParameterSet const& cfg)
             for(auto const& tag : hgcalTags)
             {
                 hgcalRecHitsToken_.push_back(consumes<HGCRecHitCollection>(tag));
+            }
+            const auto& pfTags = cfg.getParameter<std::vector<edm::InputTag>>("pfRecHits");
+            for (auto const& tag : pfTags)
+            {
+                pfRecHitsToken_.push_back(consumes<reco::PFRecHitCollection>(tag));
             }
         }
 
@@ -139,7 +149,10 @@ void MyTruthAnalyzer::beginJob() {
         //Total RecHit energy
         histContainer_["TauSimHitE"] = fs->make<TH1F>("TauSimHitE", "TauSimHitE", 1000, 0, 500);
         histContainer_["TauRecHitE"] = fs->make<TH1F>("TauRecHitE", "TauRecHitE", 1000, 0, 500);
-        histContainer_["TauEResponse"] = fs->make<TH1F>("TauEResponse", "TauEResponse", 1000, 0, 10);
+        histContainer_["TauEResponse"] = fs->make<TH1F>("TauEResponse", "TauEResponse", 100, 0, 2);
+
+        histContainer2D_["TauEResponseVsEta"] = fs->make<TH2F>("TauEResponseVsEta", "TauEResponseVsEta", 100, -5, 5, 100, 0, 2);
+        histContainer2D_["TauEResponseVsPt"] = fs->make<TH2F>("TauEResponseVsPt", "TauEResponseVsPt", 100, 0, 500, 100, 0, 2);
     }
 
     if(doDYtoLL)
@@ -164,8 +177,7 @@ void MyTruthAnalyzer::analyze(edm::Event const& event, edm::EventSetup const&) {
         auto const& graph = event.get(graphToken_);
         auto const& hitIndex  = event.get(hitIndexToken_);
         auto const& recHitMap = event.get(recHitMapToken_);
-        //auto const& hgcalRecHits = event.get(hgcalRecHitsToken_);
-        using truth::HitChannel;
+        truth::SubgraphHitView subgraphHitView(hitIndex);
 
     if(doTenTau)
     {
@@ -342,62 +354,65 @@ void MyTruthAnalyzer::analyze(edm::Event const& event, edm::EventSetup const&) {
         histContainer_["SimEleNumHigherPt5p0"]->Fill(nSimEleHigherPt5p0);
         histContainer_["TruthEleNum"]->Fill(nTruthEle);
 
-        //hitIndex
-        /*std::vector<const HGCRecHit*> globalRecHits;
-        for (auto const& token : hgcalRecHitsToken_)
-        {
-            auto const& hits = event.get(token);
-            for (auto const& hit : hits)
-            {
-                globalRecHits.push_back(&hit);
-            }
-        }*/
-        auto const& hgcee = event.get(hgcalRecHitsToken_[0]);
-        auto const& hchef = event.get(hgcalRecHitsToken_[1]);
-        auto const& hgcheb = event.get(hgcalRecHitsToken_[2]);
-
+        // RecHit indices use the concatenation order configured in the
+        // DetIdToRecHitMapProducer; keep this token list in that same order.
         std::vector<float> globalRecHitEnergy;
-        for(auto const& hit : hgcee)    globalRecHitEnergy.push_back(hit.energy());
-        for(auto const& hit : hchef)    globalRecHitEnergy.push_back(hit.energy());
-        for(auto const& hit : hgcheb)   globalRecHitEnergy.push_back(hit.energy());
-
-        int counteis0 = 0;
-        for (auto const& e : globalRecHitEnergy)
-        {
-            //if (e == 0) counteis0++;
-            std::cout << "energy = " << e << std::endl;
+        for (auto const& token : hgcalRecHitsToken_) {
+            auto const& recHits = event.get(token);
+            for (auto const& hit : recHits)
+                globalRecHitEnergy.push_back(hit.energy());
         }
-        //std::cout << "The number of energy 0 is " << counteis0 << std::endl;
+        // The DetId map appends PFRecHits after all HGCRecHits. Omitting this
+        // part makes every ECAL/HCAL index fall outside globalRecHitEnergy.
+        for (auto const& token : pfRecHitsToken_) {
+            auto const& recHits = event.get(token);
+            for (auto const& hit : recHits)
+                globalRecHitEnergy.push_back(hit.energy());
+        }
 
         for (uint32_t pid = 0; pid < hitIndex.nParticles(); ++pid)
         {
             auto const& p = graph.particle(pid);
-            if (std::abs(p.pdgId()) != 15)
+            if (!p.valid() || std::abs(p.pdgId()) != 15)
                 continue;
-            std::span<const truth::LogicalGraphHitIndex::Hit> subgraph = hitIndex.subgraphHits(HitChannel::HGCalCalo, pid);
-            float Energy = 0.f, E = 0.f;
-            for (auto const& h : subgraph)
+
+            auto const caloHits = subgraphHitView.subgraphHits(truth::HitChannel::Calo, pid);
+            double simHitEnergy = 0.;
+            double recHitEnergy = 0.;
+            for (auto const& hit : caloHits)
             {
-                Energy = Energy + h.energy;
-                if (h.hasRecHit())
-                {
-                    auto idx = h.recHitIndex;
-                    E = E + globalRecHitEnergy[idx];
-                    //if (idx > (hgcalRecHits[0].size() + hgcalRecHits[1].size())) std::cout << "Oops!!! Idx is out of the hgcalRecHits size!!!" << std::endl;
-                    //if (idx <= hgcalRecHits[0].size()) E = E + hgcalRecHits[0][idx].energy();
-                    //if (idx <= (hgcalRecHits[0].size() + hgcalRecHits[1].size())) E = E + hgcalRecHits[1][idx-hgcalRecHits[0].size()-1].energy();
-                    //if (idx <= (hgcalRecHits[0].size() + hgcalRecHits[1].size() + hgcalRecHits[2].size())) E = E + hgcalRecHits[2][idx-hgcalRecHits[0].size()-hgcalRecHits[1].size()-1].energy();
+                // hit.energy is the truth energy attributed to this subgraph
+                // in the cell; it is not the full reconstructed cell energy.
+                simHitEnergy += hit.energy;
+
+                uint32_t recHitIndex = hit.recHitIndex;
+                // Some persisted indices omit the convenience RecHit link.
+                // Recover it from the authoritative DetId -> global-index map.
+                if (!hit.hasRecHit()) {
+                    auto const found = recHitMap.find(hit.detId);
+                    if (found != recHitMap.end())
+                        recHitIndex = found->second;
+                }
+                if (recHitIndex < globalRecHitEnergy.size()) {
+                    // Check. numbers in DataFormats/DetId/interface/DetId.h
+                    recHitEnergy += globalRecHitEnergy[recHitIndex];
+                    DetId did(hit.detId);
+                    std::cout << "Found hit " << hit.detId << " in " << did.det() << " with sim energy " << hit.energy << " and rec energy " << globalRecHitEnergy[recHitIndex] << std::endl;
                 }
             }
-            histContainer_["TauSimHitE"]->Fill(Energy);
-            histContainer_["TauEResponse"]->Fill(Energy/(p.momentum().energy()));
 
-            histContainer_["TauRecHitE"]->Fill(E);
+            histContainer_["TauSimHitE"]->Fill(simHitEnergy);
+            histContainer_["TauRecHitE"]->Fill(recHitEnergy);
 
-            edm::Handle<hgcal::DetIdRecHitMap> hRecHitMap;
-            event.getByToken(recHitMapToken_, hRecHitMap);
-            if (hRecHitMap.isValid()) std::cout << "hRecHitMap is valid" << std::endl;
-            //auto const* recHitMap = hRecHitMap.isValid() ? &(*hRecHitMap) : nullptr;
+            // Calorimeter response is reconstructed energy / truth-particle
+            // energy.  Protect the division for malformed/zero-energy nodes.
+            const double particleEnergy = p.momentum().energy();
+            if (particleEnergy > 0.) {
+                const double response = recHitEnergy / particleEnergy;
+                histContainer_["TauEResponse"]->Fill(response);
+                histContainer2D_["TauEResponseVsEta"]->Fill(p.momentum().eta(), response);
+                histContainer2D_["TauEResponseVsPt"]->Fill(p.momentum().pt(), response);
+            }
         }
 
 
