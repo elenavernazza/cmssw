@@ -1,6 +1,7 @@
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
+#include <iostream>
 #include <limits>
 #include <unordered_map>
 #include <unordered_set>
@@ -26,9 +27,10 @@
 #include "SimDataFormats/TruthInfo/interface/Graph.h"
 #include "SimDataFormats/TruthInfo/interface/LogicalGraphHitIndex.h"
 #include "PhysicsTools/TruthInfo/interface/SubgraphHitView.h"
-#include "SimCalorimetry/HGCalAssociatorProducers/interface/DetIdRecHitMap.h"
+#include "DataFormats/DetId/interface/DetId.h"
+#include "DataFormats/EcalRecHit/interface/EcalRecHitCollections.h"
 #include "DataFormats/HGCRecHit/interface/HGCRecHitCollections.h"
-#include "DataFormats/ParticleFlowReco/interface/PFRecHit.h"
+#include "DataFormats/HcalRecHit/interface/HcalRecHitCollections.h"
 
 class MyTruthAnalyzer : public edm::one::EDAnalyzer<> {
 public:
@@ -48,12 +50,12 @@ private:
     
     const edm::EDGetTokenT<truth::Graph> graphToken_;
     const edm::EDGetTokenT<truth::LogicalGraphHitIndex> hitIndexToken_;
-    const edm::EDGetTokenT<hgcal::DetIdRecHitMap> recHitMapToken_;
+    const edm::EDGetTokenT<EcalRecHitCollection> ecalRecHitsToken_;
+    const edm::EDGetTokenT<HBHERecHitCollection> hcalRecHitsToken_;
 
     bool doTenTau, doDYtoLL;
 
     std::vector<edm::EDGetTokenT<HGCRecHitCollection>> hgcalRecHitsToken_;
-    std::vector<edm::EDGetTokenT<reco::PFRecHitCollection>> pfRecHitsToken_;
     
     //tentau
     mutable int totTau = 0, totTauToMu = 0, totTauToEle = 0, totTauToHadron = 0;
@@ -69,8 +71,8 @@ MyTruthAnalyzer::MyTruthAnalyzer(edm::ParameterSet const& cfg)
         : histContainer_(),
           graphToken_(consumes<truth::Graph>(cfg.getParameter<edm::InputTag>("src"))),
           hitIndexToken_(consumes<truth::LogicalGraphHitIndex>(cfg.getParameter<edm::InputTag>("hitIndex"))),
-          recHitMapToken_(consumes<hgcal::DetIdRecHitMap>(cfg.getParameter<edm::InputTag>("recHitMap"))),
-          //hgcalRecHitsToken_(consumes<HGCRecHitCollection>(cfg.getParameter<std::vector<edm::InputTag>>("hgcalRecHits"))),
+          ecalRecHitsToken_(consumes<EcalRecHitCollection>(cfg.getParameter<edm::InputTag>("ecalRecHits"))),
+          hcalRecHitsToken_(consumes<HBHERecHitCollection>(cfg.getParameter<edm::InputTag>("hcalRecHits"))),
           doTenTau(cfg.getParameter<bool>("doTenTau")),
           doDYtoLL(cfg.getParameter<bool>("doDYtoLL"))
         {
@@ -78,11 +80,6 @@ MyTruthAnalyzer::MyTruthAnalyzer(edm::ParameterSet const& cfg)
             for(auto const& tag : hgcalTags)
             {
                 hgcalRecHitsToken_.push_back(consumes<HGCRecHitCollection>(tag));
-            }
-            const auto& pfTags = cfg.getParameter<std::vector<edm::InputTag>>("pfRecHits");
-            for (auto const& tag : pfTags)
-            {
-                pfRecHitsToken_.push_back(consumes<reco::PFRecHitCollection>(tag));
             }
         }
 
@@ -176,7 +173,6 @@ void MyTruthAnalyzer::analyze(edm::Event const& event, edm::EventSetup const&) {
         //truth graph collection
         auto const& graph = event.get(graphToken_);
         auto const& hitIndex  = event.get(hitIndexToken_);
-        auto const& recHitMap = event.get(recHitMapToken_);
         truth::SubgraphHitView subgraphHitView(hitIndex);
 
     if(doTenTau)
@@ -354,21 +350,22 @@ void MyTruthAnalyzer::analyze(edm::Event const& event, edm::EventSetup const&) {
         histContainer_["SimEleNumHigherPt5p0"]->Fill(nSimEleHigherPt5p0);
         histContainer_["TruthEleNum"]->Fill(nTruthEle);
 
-        // RecHit indices use the concatenation order configured in the
-        // DetIdToRecHitMapProducer; keep this token list in that same order.
-        std::vector<float> globalRecHitEnergy;
+        // Make one simple lookup: reconstructed detector cell -> energy.
+        std::unordered_map<uint32_t, float> recEnergyByDetId;
+
         for (auto const& token : hgcalRecHitsToken_) {
             auto const& recHits = event.get(token);
             for (auto const& hit : recHits)
-                globalRecHitEnergy.push_back(hit.energy());
+                recEnergyByDetId[hit.detid().rawId()] = hit.energy();
         }
-        // The DetId map appends PFRecHits after all HGCRecHits. Omitting this
-        // part makes every ECAL/HCAL index fall outside globalRecHitEnergy.
-        for (auto const& token : pfRecHitsToken_) {
-            auto const& recHits = event.get(token);
-            for (auto const& hit : recHits)
-                globalRecHitEnergy.push_back(hit.energy());
-        }
+
+        auto const& ecalRecHits = event.get(ecalRecHitsToken_);
+        for (auto const& hit : ecalRecHits)
+            recEnergyByDetId[hit.detid().rawId()] = hit.energy();
+
+        auto const& hcalRecHits = event.get(hcalRecHitsToken_);
+        for (auto const& hit : hcalRecHits)
+            recEnergyByDetId[hit.id().rawId()] = hit.energy();
 
         for (uint32_t pid = 0; pid < hitIndex.nParticles(); ++pid)
         {
@@ -385,19 +382,16 @@ void MyTruthAnalyzer::analyze(edm::Event const& event, edm::EventSetup const&) {
                 // in the cell; it is not the full reconstructed cell energy.
                 simHitEnergy += hit.energy;
 
-                uint32_t recHitIndex = hit.recHitIndex;
-                // Some persisted indices omit the convenience RecHit link.
-                // Recover it from the authoritative DetId -> global-index map.
-                if (!hit.hasRecHit()) {
-                    auto const found = recHitMap.find(hit.detId);
-                    if (found != recHitMap.end())
-                        recHitIndex = found->second;
-                }
-                if (recHitIndex < globalRecHitEnergy.size()) {
-                    // Check. numbers in DataFormats/DetId/interface/DetId.h
-                    recHitEnergy += globalRecHitEnergy[recHitIndex];
-                    DetId did(hit.detId);
-                    std::cout << "Found hit " << hit.detId << " in " << did.det() << " with sim energy " << hit.energy << " and rec energy " << globalRecHitEnergy[recHitIndex] << std::endl;
+                auto const recHit = recEnergyByDetId.find(hit.detId);
+                DetId const detectorId(hit.detId);
+                if (recHit != recEnergyByDetId.end()) {
+                    recHitEnergy += recHit->second;
+                    std::cout << "Matched hit " << hit.detId << " in detector " << detectorId.det()
+                              << " with sim energy " << hit.energy << " and rec energy " << recHit->second
+                              << std::endl;
+                } else {
+                    std::cout << "Missing RecHit for truth hit " << hit.detId << " in detector " << detectorId.det()
+                              << " with sim energy " << hit.energy << std::endl;
                 }
             }
 

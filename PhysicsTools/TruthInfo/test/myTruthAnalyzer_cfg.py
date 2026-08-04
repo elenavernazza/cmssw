@@ -29,20 +29,13 @@ process.myTruthAnalyzer = cms.EDAnalyzer(
     "MyTruthAnalyzer",
     src = cms.InputTag("truthLogicalGraphProducer"),
     hitIndex = cms.InputTag("truthLogicalGraphHitIndexProducer"),
-    recHitMap = cms.InputTag("detIdToRecHitMapProducer"),
     hgcalRecHits = cms.VInputTag(
         cms.InputTag("HGCalRecHit", "HGCEERecHits"),
         cms.InputTag("HGCalRecHit", "HGCHEFRecHits"),
         cms.InputTag("HGCalRecHit", "HGCHEBRecHits"),
     ),
-    # These must follow the HGC collections and match exactly the PFRecHit
-    # ordering configured in detIdToRecHitMapProducer.
-    pfRecHits = cms.VInputTag(
-        cms.InputTag("particleFlowRecHitECAL", "Cleaned"),
-        cms.InputTag("particleFlowRecHitHBHE", "Cleaned"),
-        cms.InputTag("particleFlowRecHitHF", "Cleaned"),
-        cms.InputTag("particleFlowRecHitHO", "Cleaned"),
-    ),
+    ecalRecHits = cms.InputTag("ecalRecHit", "EcalRecHitsEB"),
+    hcalRecHits = cms.InputTag("hbhereco"),
     doTenTau = cms.bool(True),
     doDYtoLL = cms.bool(False),
 )
