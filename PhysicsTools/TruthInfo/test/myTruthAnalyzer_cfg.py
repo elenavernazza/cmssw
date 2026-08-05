@@ -25,10 +25,20 @@ process.TFileService = cms.Service(
     #fileName = cms.string("myDYtoLL.root")
 )
 
+# process.truthBranchTracksterAssociators.branchSelector.pdgIds = cms.vint32(211, -211)
+# process.truthBranchTracksterAssociators.branchSelector.ptMin = cms.double(1.0)
+# process.truthBranchTracksterAssociators.branchSelector.etaMin = cms.double(-3.0)
+# process.truthBranchTracksterAssociators.branchSelector.etaMax = cms.double(3.0)
+
 process.myTruthAnalyzer = cms.EDAnalyzer(
     "MyTruthAnalyzer",
     src = cms.InputTag("truthLogicalGraphProducer"),
     hitIndex = cms.InputTag("truthLogicalGraphHitIndexProducer"),
+    tracksters     = cms.InputTag("ticlCandidate"),
+    truthToTrackster = cms.InputTag(
+        "truthBranchTracksterAssociators",
+        "ticlCandidateTruthToReco" # be careful, this has two directions: ticlCandidateTruthToReco and ticlCandidateRecoToTruthFixed (or Adaptive)
+    ),
     hgcalRecHits = cms.VInputTag(
         cms.InputTag("HGCalRecHit", "HGCEERecHits"),
         cms.InputTag("HGCalRecHit", "HGCHEFRecHits"),
@@ -42,5 +52,6 @@ process.myTruthAnalyzer = cms.EDAnalyzer(
 
 process.truthanalyzer = cms.Path(
     process.truthGraphPrevalidation
+    # + process.truthBranchTracksterAssociators
     + process.myTruthAnalyzer
 )

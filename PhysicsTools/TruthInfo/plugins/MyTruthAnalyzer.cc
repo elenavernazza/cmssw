@@ -32,6 +32,12 @@
 #include "DataFormats/HGCRecHit/interface/HGCRecHitCollections.h"
 #include "DataFormats/HcalRecHit/interface/HcalRecHitCollections.h"
 
+#include "DataFormats/HGCalReco/interface/Trackster.h"
+#include "SimDataFormats/Associations/interface/TICLAssociationMap.h"
+
+using TracksterAssociationMap =
+    ticl::AssociationMap<ticl::mapWithSharedEnergyAndScore>;
+
 class MyTruthAnalyzer : public edm::one::EDAnalyzer<> {
 public:
     explicit MyTruthAnalyzer(edm::ParameterSet const&);
@@ -52,6 +58,8 @@ private:
     const edm::EDGetTokenT<truth::LogicalGraphHitIndex> hitIndexToken_;
     const edm::EDGetTokenT<EcalRecHitCollection> ecalRecHitsToken_;
     const edm::EDGetTokenT<HBHERecHitCollection> hcalRecHitsToken_;
+    const edm::EDGetTokenT<TracksterAssociationMap> truthToTracksterToken_;
+    const edm::EDGetTokenT<std::vector<ticl::Trackster>> trackstersToken_;
 
     bool doTenTau, doDYtoLL;
 
@@ -63,7 +71,6 @@ private:
     //DYtoLL
     mutable int totZ = 0, totZToEle = 0, totZToMu = 0, totZToTau = 0, totZToNot2Particles = 0, totZToNot2Leptons = 0, totZTo1Particle = 0;
 
-
 };
 
 
@@ -73,6 +80,8 @@ MyTruthAnalyzer::MyTruthAnalyzer(edm::ParameterSet const& cfg)
           hitIndexToken_(consumes<truth::LogicalGraphHitIndex>(cfg.getParameter<edm::InputTag>("hitIndex"))),
           ecalRecHitsToken_(consumes<EcalRecHitCollection>(cfg.getParameter<edm::InputTag>("ecalRecHits"))),
           hcalRecHitsToken_(consumes<HBHERecHitCollection>(cfg.getParameter<edm::InputTag>("hcalRecHits"))),
+          truthToTracksterToken_(consumes<TracksterAssociationMap>(cfg.getParameter<edm::InputTag>("truthToTrackster"))),
+          trackstersToken_(consumes<std::vector<ticl::Trackster>>(cfg.getParameter<edm::InputTag>("tracksters"))),
           doTenTau(cfg.getParameter<bool>("doTenTau")),
           doDYtoLL(cfg.getParameter<bool>("doDYtoLL"))
         {
@@ -174,6 +183,69 @@ void MyTruthAnalyzer::analyze(edm::Event const& event, edm::EventSetup const&) {
         auto const& graph = event.get(graphToken_);
         auto const& hitIndex  = event.get(hitIndexToken_);
         truth::SubgraphHitView subgraphHitView(hitIndex);
+
+        auto const& tracksters = event.get(trackstersToken_);
+        auto const& associationProduct = event.get(truthToTracksterToken_);
+        auto const& pionToTrackster = associationProduct.getMap();
+
+        for (truth::Particle pion : graph.particleViews()) {
+            if (!pion.valid())
+                continue;
+
+            if (std::abs(pion.pdgId()) != 211)
+                continue;
+
+            // Require the pion to originate from a tau decay.
+            if (!(pion.hasAncestorPdgId(15) ||
+                pion.hasAncestorPdgId(-15)))
+                continue;
+
+            // Offline TICL acceptance.
+            const double absEta =
+                std::abs(pion.momentum().eta());
+
+            if (absEta < 1.5 || absEta > 3.0)
+                continue;
+
+            const uint32_t pionId = pion.id();
+
+            if (pionId >= pionToTrackster.size()) {
+                std::cout << "Truth pion " << pionId
+                        << " is outside the association map\n";
+                continue;
+            }
+
+            auto const& tracksterMatches =
+                pionToTrackster[pionId];
+
+            if (tracksterMatches.empty()) {
+                std::cout << "Truth pion " << pionId
+                        << " has no matched Trackster\n";
+                continue;
+            }
+
+            // Print all matched tracksters pt and eta
+            for (auto const& match : tracksterMatches) {
+                const uint32_t tracksterId = match.index();
+                const double score = match.score();
+                const double sharedEnergyFrac = match.value();
+
+                if (tracksterId >= tracksters.size()) {
+                    std::cout << "Trackster " << tracksterId
+                            << " is outside the Trackster collection\n";
+                    continue;
+                }
+
+                auto const& trackster = tracksters[tracksterId];
+
+                std::cout << "Truth pion " << pionId
+                        << " matched to Trackster " << tracksterId
+                        << " with score " << score
+                        << ", shared energy fraction " << sharedEnergyFrac
+                        << ", pt = " << trackster.raw_pt()
+                        << ", barycenter = " << trackster.barycenter() << "\n";
+            }
+        }
 
     if(doTenTau)
     {
@@ -386,11 +458,11 @@ void MyTruthAnalyzer::analyze(edm::Event const& event, edm::EventSetup const&) {
                 DetId const detectorId(hit.detId);
                 if (recHit != recEnergyByDetId.end()) {
                     recHitEnergy += recHit->second;
-                    std::cout << "Matched hit " << hit.detId << " in detector " << detectorId.det()
+                    std::cout << "  Matched hit " << hit.detId << " in detector " << detectorId.det()
                               << " with sim energy " << hit.energy << " and rec energy " << recHit->second
                               << std::endl;
                 } else {
-                    std::cout << "Missing RecHit for truth hit " << hit.detId << " in detector " << detectorId.det()
+                    std::cout << "  Missing RecHit for truth hit " << hit.detId << " in detector " << detectorId.det()
                               << " with sim energy " << hit.energy << std::endl;
                 }
             }
