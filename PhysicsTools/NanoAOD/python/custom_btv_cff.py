@@ -83,6 +83,29 @@ def update_jets_AK4(process):
         ),
     )
 
+    # Dedicated adapter for the b-hive UParT_v0_mass_reg model.  It consumes
+    # the same tag-info collection, but builds the model-specific 20/10/15
+    # CPF/NPF/SV feature tensors and reads both ONNX output heads.
+    process.pfMyUParTMassRegressionJetTagsPuppiWithDeepInfo = cms.EDProducer(
+        "BHiveUParTMassRegressionONNXJetTagsProducer",
+        src = cms.InputTag("pfMyUnifiedParticleTransformerAK4TagInfosPuppiWithDeepInfo"),
+        input_names = cms.vstring("input_1", "input_2", "input_3"),
+        model_path = cms.FileInPath(
+            "RecoBTag/Combined/data/UParTAK4/PUPPI/BsTauTau/UParT_v0_mass_reg.onnx"
+        ),
+        output_names = cms.vstring("classification", "regression"),
+        output_labels = cms.vstring(
+            "ditauh",
+            "ditaumu",
+            "ditaue",
+            "bkg",
+            "masscentral",
+            "massq16",
+            "massq84",
+            "ptnu",
+        ),
+    )
+
     def _vinput_sum(*groups):
         return cms.VInputTag(*[tag for group in groups for tag in group])
 
@@ -139,6 +162,7 @@ def update_jets_AK4(process):
     getPatAlgosToolsTask(process).add(
         process.pfMyUnifiedParticleTransformerAK4TagInfosPuppiWithDeepInfo,
         process.pfMyUnifiedParticleTransformerAK4JetTagsPuppiWithDeepInfo,
+        process.pfMyUParTMassRegressionJetTagsPuppiWithDeepInfo,
         process.pfMyUnifiedParticleTransformerAK4DiscriminatorsJetTagsPuppiWithDeepInfo,
     )
     
@@ -156,6 +180,10 @@ def update_jets_AK4(process):
         cms.InputTag("pfMyUnifiedParticleTransformerAK4DiscriminatorsJetTagsPuppiWithDeepInfo", "probb"),
         cms.InputTag("pfMyUnifiedParticleTransformerAK4DiscriminatorsJetTagsPuppiWithDeepInfo", "probc"),
         cms.InputTag("pfMyUnifiedParticleTransformerAK4DiscriminatorsJetTagsPuppiWithDeepInfo", "probother"),
+        *[
+            cms.InputTag("pfMyUParTMassRegressionJetTagsPuppiWithDeepInfo", label)
+            for label in process.pfMyUParTMassRegressionJetTagsPuppiWithDeepInfo.output_labels
+        ],
     )
 
     process.updatedPatJetsTransientCorrectedPuppiWithDeepInfo.tagInfoSources.append(
@@ -572,6 +600,45 @@ def get_UnifiedParticleTransformerAK4_outputs():
 
     return UnifiedParticleTransformerAK4OutputVars
 
+def get_UParTMassRegression_outputs():
+    # Retrieve all output of the regression model, but the onle effective oens are 
+    # UParTRegMassCentral, UParTRegMassQ16, UParTRegMassQ84
+    tagger = "pfMyUParTMassRegressionJetTags"
+    return cms.PSet(
+        btagUParTRegDiTauH=Var(
+            "bDiscriminator('%s:ditauh')" % tagger,
+            float, precision=10, doc="UParT mass-regression model hadronic ditau probability",
+        ),
+        btagUParTRegDiTauMu=Var(
+            "bDiscriminator('%s:ditaumu')" % tagger,
+            float, precision=10, doc="UParT mass-regression model muonic ditau probability",
+        ),
+        btagUParTRegDiTauE=Var(
+            "bDiscriminator('%s:ditaue')" % tagger,
+            float, precision=10, doc="UParT mass-regression model electronic ditau probability",
+        ),
+        btagUParTRegBkg=Var(
+            "bDiscriminator('%s:bkg')" % tagger,
+            float, precision=10, doc="UParT mass-regression model background probability",
+        ),
+        UParTRegMassCentral=Var(
+            "bDiscriminator('%s:masscentral')" % tagger,
+            float, precision=10, doc="UParT central visible-ditau mass ratio regression",
+        ),
+        UParTRegMassQ16=Var(
+            "bDiscriminator('%s:massq16')" % tagger,
+            float, precision=10, doc="UParT visible-ditau mass ratio q=0.16 loss head",
+        ),
+        UParTRegMassQ84=Var(
+            "bDiscriminator('%s:massq84')" % tagger,
+            float, precision=10, doc="UParT visible-ditau mass ratio q=0.84 loss head",
+        ),
+        UParTRegPtNu=Var(
+            "bDiscriminator('%s:ptnu')" % tagger,
+            float, precision=10, doc="UParT gen-pT-with-neutrinos over jet-pT regression",
+        ),
+    )
+
 
 
 def add_BTV(process,  addAK4=False, addAK8=False, scheme="btvSF"):
@@ -637,6 +704,7 @@ def add_BTV(process,  addAK4=False, addAK8=False, scheme="btvSF"):
                 get_DeepJet_outputs(),  # outputs are added in any case, inputs only if requested
                 get_ParticleNetAK4_outputs(),
                 get_UnifiedParticleTransformerAK4_outputs(),
+                get_UParTMassRegression_outputs(),
                 get_ParticleTransformerAK4_outputs(),# removed in 2024
             ))
     
