@@ -13,8 +13,8 @@ from tqdm import tqdm
 
 DEFAULT_INPUT_GLOB = ("/eos/user/a/agruber/samples/HLT_Upgrade_L1filter/ParT_unfiltered_16_1_1/Phase2_L1P2GT_HLT_*.root")
 PT_EDGES = array("d", [0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 70, 80, 90, 100, 120, 140, 160, 200])
-ETA_NBINS = 25
-ETA_RANGE = (-2.5, 2.5)
+ETA_NBINS = 30
+ETA_RANGE = (-3., 3.)
 
 # HLT Triggers under study
 TRIGGERS = (
