@@ -13,7 +13,7 @@ from tqdm import tqdm
 
 DEFAULT_INPUT_GLOB = ("/eos/user/a/agruber/samples/HLT_Upgrade_L1filter/ParT_unfiltered_16_1_1/Phase2_L1P2GT_HLT_*.root")
 PT_EDGES = array("d", [0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 70, 80, 90, 100, 120, 140, 160, 200])
-ETA_NBINS = 30
+ETA_NBINS = 20
 ETA_RANGE = (-3., 3.)
 
 # HLT Triggers under study
@@ -21,14 +21,17 @@ TRIGGERS = (
     (
         "HLT_DoubleMediumChargedIsoPFTauHPS40_eta2p1",
         "hltHpsDoublePFTau40TrackPt1MediumChargedIsolation",
+        40.0,
     ),
     (
         "HLT_DoubleMediumDeepTauPFTauHPS35_eta2p1",
         "hltHpsDoublePFTau35MediumDitauWPDeepTau",
+        35.0,
     ),
     (
         "HLT_DoubleMediumPFPuppiParTTauh30_eta2p1",
         "hltDoublePFJets30ParTTauhTagMediumWPL2DoubleTau",
+        30.0,
     ),
 )
 
@@ -125,7 +128,7 @@ def extract_cache(files, cache_name, max_events=-1):
         )
 
         all_trigger_objects = trigger_event.getObjects()
-        for path, filter_name in TRIGGERS:
+        for path, filter_name, _ in TRIGGERS:
             trigger_index = find_trigger_index(trigger_names, path)
             has_path = trigger_index is not None
             path_present.append(has_path)
@@ -231,6 +234,40 @@ def fill_pair_histograms(histograms, domain, events, pt, eta):
     histograms[f"{domain}Tau1_pt_vs_{domain}Tau2_pt_{events}"].Fill(pt[0], pt[1])
     histograms[f"{domain}Tau1_eta_vs_{domain}Tau2_eta_{events}"].Fill(eta[0], eta[1])
 
+def fill_gen_nminus1_histograms(histograms, events, pt, eta, pt_min):
+    """Fill gen histograms after removing cuts on the plotted variables.
+
+    For a 1D histogram, only the acceptance cut on its x-axis variable is
+    removed. For a 2D histogram, the corresponding cut is removed for both
+    axes. All acceptance cuts on the other variables remain applied.
+    """
+    pt_pass = (pt[0] > pt_min, pt[1] > pt_min)
+    eta_pass = (abs(eta[0]) < GEN_ETA_MAX, abs(eta[1]) < GEN_ETA_MAX)
+
+    # pT of tau 1: omit pT1, retain eta1, pT2, and eta2.
+    if eta_pass[0] and pt_pass[1] and eta_pass[1]:
+        histograms[f"genTau1_pt_{events}"].Fill(pt[0])
+
+    # pT of tau 2: omit pT2, retain pT1, eta1, and eta2.
+    if pt_pass[0] and eta_pass[0] and eta_pass[1]:
+        histograms[f"genTau2_pt_{events}"].Fill(pt[1])
+
+    # eta of tau 1: omit eta1, retain pT1, pT2, and eta2.
+    if pt_pass[0] and pt_pass[1] and eta_pass[1]:
+        histograms[f"genTau1_eta_{events}"].Fill(eta[0])
+
+    # eta of tau 2: omit eta2, retain pT1, eta1, and pT2.
+    if pt_pass[0] and eta_pass[0] and pt_pass[1]:
+        histograms[f"genTau2_eta_{events}"].Fill(eta[1])
+
+    # pT1 versus pT2: omit both pT cuts, retain both eta cuts.
+    if eta_pass[0] and eta_pass[1]:
+        histograms[f"genTau1_pt_vs_genTau2_pt_{events}"].Fill(pt[0], pt[1])
+
+    # eta1 versus eta2: omit both eta cuts, retain both pT cuts.
+    if pt_pass[0] and pt_pass[1]:
+        histograms[f"genTau1_eta_vs_genTau2_eta_{events}"].Fill(eta[0], eta[1])
+
 GEN_EVENT_DEN = (
     "ev_2tauh",
     "ev_2tauh_acc",
@@ -248,15 +285,16 @@ RECO_EVENT = (
 def initialize_histograms():
     histograms = {}
 
-    for name in GEN_EVENT_DEN:
-        add_pair_histograms(histograms, "gen", name)
-    for name in GEN_EVENT_NUM:
-        for path, _ in TRIGGERS:
+    # ev_2tauh is common. Acceptance-dependent denominators must be booked per
+    # trigger because each trigger has a different gen-pT threshold.
+    add_pair_histograms(histograms, "gen", "ev_2tauh")
+    for name in GEN_EVENT_DEN[1:] + GEN_EVENT_NUM:
+        for path, _, _ in TRIGGERS:
             path_skimmed = path.split("HLT_")[-1]
             add_pair_histograms(histograms, "gen", f"{name}_{path_skimmed}")
 
     for name in RECO_EVENT:
-        for path, _ in TRIGGERS:
+        for path, _, _ in TRIGGERS:
             path_skimmed = path.split("HLT_")[-1]
             add_pair_histograms(histograms, "reco", f"{name}_{path_skimmed}")
 
@@ -269,8 +307,8 @@ def delta_phi(first, second):
 def delta_r2(eta1, phi1, eta2, phi2):
     return (eta1 - eta2) ** 2 + delta_phi(phi1, phi2) ** 2
 
-def is_within_acceptance(pt, eta):
-    return ( pt > GEN_PT_MIN and abs(eta) < GEN_ETA_MAX)
+def is_within_acceptance(pt, eta, pt_min):
+    return pt > pt_min and abs(eta) < GEN_ETA_MAX
 
 def one_to_one_matches(gen_eta, gen_phi, reco_eta, reco_phi):
     """Return a reco index (or -1) for each gen tau, maximizing match count."""
@@ -343,20 +381,33 @@ def run_gen_loop(cached_data, histograms, cutflow):
         selected_pt, selected_eta, selected_phi = gen_pt[:2], gen_eta[:2], gen_phi[:2]
         fill_pair_histograms(histograms, "gen", "ev_2tauh", selected_pt, selected_eta)
 
-        # DEN 2. Check that the two gen taus (decaying hadronically by definition) are within acceptance in eta and pt
-        if not all(is_within_acceptance(pt, eta) for pt, eta in zip(selected_pt, selected_eta)):
-            continue
-        cutflow["events_with_two_gen_taus_h_within_acceptance"] += 1
-        fill_pair_histograms(histograms, "gen", "ev_2tauh_acc", selected_pt, selected_eta)
-
-        # DEN 3. Check that the event passes L1 trigger bit
-        if not bool(cached_data["pDoublePuppiTau52_52"][event_index]):
-            continue
-        cutflow["events_with_two_gen_taus_h_within_acceptance_firing_L1"] += 1
-        fill_pair_histograms(histograms, "gen", "ev_2tauh_acc_L1", selected_pt, selected_eta)
-
-        for trigger_index, (path, _) in enumerate(TRIGGERS):
+        for trigger_index, (path, _, gen_pt_min) in enumerate(TRIGGERS):
             path_skimmed = path.split("HLT_")[-1]
+
+            # The cutflow uses the complete acceptance. Histograms use the
+            # N-minus-one acceptance defined per plotted variable.
+            passes_full_acceptance = all(
+                is_within_acceptance(pt, eta, gen_pt_min)
+                for pt, eta in zip(selected_pt, selected_eta)
+            )
+            if passes_full_acceptance:
+                cutflow["events_with_two_gen_taus_h_within_acceptance_" + path] += 1
+            fill_gen_nminus1_histograms(
+                histograms, f"ev_2tauh_acc_{path_skimmed}",
+                selected_pt, selected_eta, gen_pt_min
+            )
+
+            # DEN 3. Check that the event passes the common L1 seed.
+            if not bool(cached_data["pDoublePuppiTau52_52"][event_index]):
+                continue
+            if passes_full_acceptance:
+                cutflow[
+                    "events_with_two_gen_taus_h_within_acceptance_firing_L1_" + path
+                ] += 1
+            fill_gen_nminus1_histograms(
+                histograms, f"ev_2tauh_acc_L1_{path_skimmed}",
+                selected_pt, selected_eta, gen_pt_min
+            )
 
             if not cached_data["path_present"][event_index, trigger_index]:
                 continue
@@ -367,15 +418,23 @@ def run_gen_loop(cached_data, histograms, cutflow):
             accepted = bool(cached_data["accepted"][event_index, trigger_index])
             if not accepted:
                 continue
-            cutflow["events_with_two_gen_taus_h_within_acceptance_firing_L1_HLT_" + path] += 1
-            fill_pair_histograms(histograms, "gen", f"ev_2tauh_acc_L1_HLT_{path_skimmed}", selected_pt, selected_eta)
+            if passes_full_acceptance:
+                cutflow["events_with_two_gen_taus_h_within_acceptance_firing_L1_HLT_" + path] += 1
+            fill_gen_nminus1_histograms(
+                histograms, f"ev_2tauh_acc_L1_HLT_{path_skimmed}",
+                selected_pt, selected_eta, gen_pt_min
+            )
 
             # NUM 2. Check that the event fired the HLT path and it was fired by the signal taus
             reco_pt, reco_eta, reco_phi = event_reco(cached_data, event_index, trigger_index)
             matches = one_to_one_matches(selected_eta, selected_phi, reco_eta, reco_phi)
             if matches[0] >= 0 and matches[1] >= 0:
-                cutflow["events_with_two_gen_taus_h_within_acceptance_firing_L1_HLT_matched_" + path] += 1
-                fill_pair_histograms(histograms, "gen", f"ev_2tauh_acc_L1_HLT_match_{path_skimmed}", selected_pt, selected_eta)
+                if passes_full_acceptance:
+                    cutflow["events_with_two_gen_taus_h_within_acceptance_firing_L1_HLT_matched_" + path] += 1
+                fill_gen_nminus1_histograms(
+                    histograms, f"ev_2tauh_acc_L1_HLT_match_{path_skimmed}",
+                    selected_pt, selected_eta, gen_pt_min
+                )
 
 
 def run_reco_loop(cached_data, histograms, cutflow):
@@ -385,7 +444,7 @@ def run_reco_loop(cached_data, histograms, cutflow):
     for event_index in range(nevents):
         gen_pt, gen_eta, gen_phi = event_gen(cached_data, event_index)
 
-        for trigger_index, (path, _) in enumerate(TRIGGERS):
+        for trigger_index, (path, _, _) in enumerate(TRIGGERS):
             path_skimmed = path.split("HLT_")[-1]
 
             if not cached_data["path_present"][event_index, trigger_index]:
@@ -418,10 +477,10 @@ def initialize_cutflow():
     cutflow = {
         "all_events": 0,
         "events_with_two_gen_taus_h": 0,
-        "events_with_two_gen_taus_h_within_acceptance": 0,
-        "events_with_two_gen_taus_h_within_acceptance_firing_L1": 0,
     }
-    for path, _ in TRIGGERS:
+    for path, _, _ in TRIGGERS:
+        cutflow["events_with_two_gen_taus_h_within_acceptance_" + path] = 0
+        cutflow["events_with_two_gen_taus_h_within_acceptance_firing_L1_" + path] = 0
         cutflow["events_with_two_gen_taus_h_within_acceptance_firing_L1_HLT_" + path] = 0
         cutflow["events_with_two_gen_taus_h_within_acceptance_firing_L1_HLT_matched_" + path] = 0
     
@@ -450,7 +509,6 @@ if __name__ == "__main__":
     parser.add_argument("--reuse-cache", action="store_true", help="skip EDM reading and analyze an existing --cache file")
     parser.add_argument("--max-events", type=int, default=-1, help="limit extraction for testing")
     parser.add_argument("--cache-version", type=int, default=1, help="Cache version")
-    parser.add_argument("--gen-pt-min", type=float, default=40, help="Minimum pT for gen taus")
     parser.add_argument("--gen-eta-max", type=float, default=2.1, help="Maximum |eta| for gen taus")
     parser.add_argument("--deltaR", type=float, default=0.1, help="Threshold for deltaR macthing gen-reco")
     args = parser.parse_args()
@@ -463,7 +521,6 @@ if __name__ == "__main__":
 
     TRIGGER_PROCESS = "HLTX"
     CACHE_VERSION = args.cache_version
-    GEN_PT_MIN = args.gen_pt_min
     GEN_ETA_MAX = args.gen_eta_max
     MATCH_DR = args.deltaR
     MATCH_DR2 = MATCH_DR * MATCH_DR
