@@ -16,22 +16,23 @@ PT_EDGES = array("d", [0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 70, 80,
 ETA_NBINS = 20
 ETA_RANGE = (-3., 3.)
 
+MINUS = 10
 # HLT Triggers under study
 TRIGGERS = (
     (
         "HLT_DoubleMediumChargedIsoPFTauHPS40_eta2p1",
         "hltHpsDoublePFTau40TrackPt1MediumChargedIsolation",
-        40.0,
+        40.0-MINUS,
     ),
     (
         "HLT_DoubleMediumDeepTauPFTauHPS35_eta2p1",
         "hltHpsDoublePFTau35MediumDitauWPDeepTau",
-        35.0,
+        35.0-MINUS,
     ),
     (
         "HLT_DoubleMediumPFPuppiParTTauh30_eta2p1",
         "hltDoublePFJets30ParTTauhTagMediumWPL2DoubleTau",
-        30.0,
+        30.0-MINUS,
     ),
 )
 
