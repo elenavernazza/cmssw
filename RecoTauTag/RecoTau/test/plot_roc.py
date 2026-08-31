@@ -199,6 +199,84 @@ def print_working_point(label, description, point):
     )
 
 
+def make_raw_distributions(data, labels, curves, output_path):
+    """Plot normalized signal and background discriminator-score shapes."""
+    categories = (
+        (1, "Signal: gen-matched", "tab:blue"),
+        (0, "Background: unmatched", "tab:orange"),
+    )
+    bins = np.linspace(0.0, 1.0, 51)
+    figure_width = max(8.0, 7.0 * len(curves))
+    fig, axes = plt.subplots(
+        1,
+        len(curves),
+        figsize=(figure_width, 6),
+        sharey=True,
+        squeeze=False,
+    )
+
+    for axis, name in zip(axes[0], curves):
+        scores = data[name]["score"]
+        object_labels = data[name]["label"]
+
+        for category, category_label, color in categories:
+            selected_scores = scores[
+                (object_labels == category) & np.isfinite(scores)
+            ]
+            if selected_scores.size == 0:
+                raise ValueError(
+                    f"Cannot plot {labels[name]}: no {category_label} entries"
+                )
+
+            # Normalize signal and background independently. This compares
+            # their shapes without the much larger background yield hiding
+            # the signal; the unnormalized counts remain in the legend.
+            weights = np.full(
+                selected_scores.size,
+                1.0 / selected_scores.size,
+            )
+            axis.hist(
+                selected_scores,
+                bins=bins,
+                weights=weights,
+                histtype="step",
+                linewidth=2.0,
+                color=color,
+                label=f"{category_label} (N={selected_scores.size:,})",
+            )
+
+        axis.set_xlabel(f"{labels[name]} score")
+        axis.set_xlim(0.0, 1.0)
+        axis.set_yscale("log")
+        axis.minorticks_on()
+        axis.grid(which="major", alpha=0.25)
+        axis.grid(which="minor", alpha=0.10)
+        axis.legend(frameon=False, fontsize=11)
+
+    axes[0, 0].set_ylabel("Fraction of objects / 0.02")
+    hep.cms.label(
+        data=False,
+        label="Preliminary",
+        ax=axes[0, 0],
+        loc=0,
+        com=14,
+    )
+    fig.tight_layout()
+
+    raw_output = output_path.with_name(
+        f"{output_path.stem}_raw_distributions{output_path.suffix}"
+    )
+    raw_pdf = raw_output.with_suffix(".pdf")
+    fig.savefig(raw_output, bbox_inches="tight")
+    if raw_pdf != raw_output:
+        fig.savefig(raw_pdf, bbox_inches="tight")
+    plt.close(fig)
+
+    print(f"Saved {raw_output}")
+    if raw_pdf != raw_output:
+        print(f"Saved {raw_pdf}")
+
+
 def parse_arguments():
     parser = argparse.ArgumentParser(
         description=(
@@ -295,6 +373,11 @@ def main():
         )
         for name in args.curves
     }
+
+    output_path = Path(args.output)
+    if output_path.suffix == "":
+        output_path = output_path.with_suffix(".png")
+    make_raw_distributions(data, labels, args.curves, output_path)
 
     fig, axis = plt.subplots(figsize=(9, 7))
     for name in args.curves:
@@ -396,9 +479,6 @@ def main():
     axis.legend(loc="upper left", frameon=False, fontsize=12)
     fig.tight_layout()
 
-    output_path = Path(args.output)
-    if output_path.suffix == "":
-        output_path = output_path.with_suffix(".png")
     pdf_path = output_path.with_suffix(".pdf")
     fig.savefig(output_path, bbox_inches="tight")
     if pdf_path != output_path:
