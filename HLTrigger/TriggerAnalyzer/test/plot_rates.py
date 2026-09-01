@@ -7,6 +7,7 @@ normalization.
 """
 
 import argparse
+import re
 import sys
 from pathlib import Path
 
@@ -15,20 +16,19 @@ import matplotlib.ticker as ticker
 import numpy as np
 import uproot
 
+import mplhep as hep
+plt.style.use(hep.style.CMS)
 
 PREFIX = "TriggerAnalyzerStitch"
 PATH_STYLES = {
     "HLT_DoubleMediumChargedIsoPFTauHPS40_eta2p1": {
-        "color": "#c43c39", "linestyle": "--", "label": "HPS ChargedIso40",
+        "color": "#c43c39", "linestyle": "--", "label": "HLT_DoubleMediumChargedIsoPFTauHPS40_eta2p1",
     },
     "HLT_DoubleMediumDeepTauPFTauHPS35_eta2p1": {
-        "color": "#2878b5", "linestyle": "--", "label": "HPS DeepTau35",
-    },
-    "HLT_DoublePNetTauh": {
-        "color": "#3a923a", "linestyle": "-", "label": "PNet Tauh",
+        "color": "#e07b17", "linestyle": "--", "label": "HLT_DoubleMediumDeepTauPFTauHPS35_eta2p1",
     },
     "HLT_DoubleParTTauh": {
-        "color": "#e07b17", "linestyle": "-", "label": "ParT Tauh",
+        "color": "#2878b5", "linestyle": "--", "label": "HLT_DoubleMediumPFPuppiParTTauh30_eta2p1",
     },
 }
 WEIGHT_STATUS_LABELS = ("ok", "no_pu")
@@ -41,8 +41,8 @@ def parse_args():
     parser.add_argument("--prefix", default=PREFIX)
     parser.add_argument("--path", action="append", default=None,
                         help="HLT path to plot; repeatable (default: all known paths present)")
-    parser.add_argument("--object", choices=("lead", "sub"), default="sub",
-                        help="Trigger-object threshold to scan")
+    parser.add_argument("--object", choices=("lead", "sub", "both"), default="sub",
+                        help="Trigger-object threshold to scan; 'both' makes a 2D lead/sublead map")
     parser.add_argument("--overlay-l1", action="store_true",
                         help="Overlay available L1 seed-object threshold curves")
     parser.add_argument("--out", default="rate_vs_pt_threshold.png")
@@ -141,6 +141,87 @@ def threshold_curve(inputs, key):
     return edges[:-1], rate_hz / 1.0e3, np.sqrt(variance_hz2) / 1.0e3
 
 
+def threshold_map(inputs, key):
+    """Return rate for simultaneous lead>=x and sublead>=y thresholds."""
+    total_values = None
+    x_edges = None
+    y_edges = None
+    for item in inputs:
+        if key not in item["root"]:
+            continue
+        histogram = item["root"][key]
+        values = np.asarray(histogram.values(flow=True), dtype=float)
+        edges_x = np.asarray(histogram.axes[0].edges(flow=False), dtype=float)
+        edges_y = np.asarray(histogram.axes[1].edges(flow=False), dtype=float)
+        if total_values is None:
+            total_values = np.zeros_like(values)
+            x_edges, y_edges = edges_x, edges_y
+        elif (values.shape != total_values.shape or
+              not np.allclose(edges_x, x_edges) or not np.allclose(edges_y, y_edges)):
+            raise ValueError(f"Histogram binning mismatch for {key} in {item['path']}")
+        total_values += values
+    if total_values is None:
+        return None
+
+    # Include the overflow bins, exclude underflow, and integrate from high pT
+    # downwards along both axes. The last row/column is overflow and therefore
+    # is included in every regular-bin threshold but is not itself plotted.
+    regular_and_overflow = total_values[1:, 1:]
+    rates_hz = np.cumsum(
+        np.cumsum(regular_and_overflow[::-1, ::-1], axis=0), axis=1
+    )[::-1, ::-1]
+    return x_edges, y_edges, rates_hz[:-1, :-1] / 1.0e3
+
+
+def plot_threshold_maps(args, inputs, paths):
+    positive_rates = []
+    maps = []
+    for path in paths:
+        key = f"{args.prefix}/{path}/pt_lead_vs_sub_triggered_weighted"
+        rate_map = threshold_map(inputs, key)
+        maps.append((path, rate_map))
+        if rate_map is not None:
+            positive_rates.extend(rate_map[2][rate_map[2] > 0])
+    if not positive_rates:
+        raise ValueError("No 2D weighted trigger-object histograms were available; rerun run_rate.py after rebuilding CMSSW")
+
+    from matplotlib.colors import LogNorm
+    vmin = max(args.y_min, min(positive_rates))
+    vmax = max(args.y_max, max(positive_rates))
+    if vmax <= vmin:
+        vmax = max(10.0 * vmin, max(positive_rates))
+    output = Path(args.out)
+    for index, (path, rate_map) in enumerate(maps):
+        if rate_map is None:
+            continue
+        figure, axis = plt.subplots(figsize=(10, 10))
+
+        hep.cms.label("", data=False, com=14, ax=axis, loc=0)
+
+        x_edges, y_edges, rates = rate_map
+        masked_rates = np.ma.masked_less_equal(rates.T, 0.0)
+        image = axis.pcolormesh(x_edges, y_edges, masked_rates, shading="auto",
+                                norm=LogNorm(vmin=vmin, vmax=vmax), cmap="viridis", rasterized=True)
+        style = style_for(path, index)
+        axis.text(0.03, 0.97, args.title or style["label"], color="white", transform=axis.transAxes, ha="left", va="top", fontsize=15)
+        axis.set_xlabel(r"Leading $\tau$ $p_{\mathrm{T}}$ threshold [GeV]")
+        axis.set_ylabel(r"Subleading $\tau$ $p_{\mathrm{T}}$ threshold [GeV]")
+        axis.set_xlim(args.x_min, args.x_max)
+        axis.set_ylim(args.x_min, args.x_max)
+        figure.colorbar(image, ax=axis, label="Rate [kHz]")
+        figure.tight_layout()
+
+        path_tag = re.sub(r"[^A-Za-z0-9]+", "_", path).strip("_")
+        suffix = output.suffix or ".png"
+        output_path = output.with_name(f"{output.stem}_{path_tag}{suffix}")
+        figure.savefig(output_path, dpi=150)
+        suffix = output.suffix or ".pdf"
+        output_path = output.with_name(f"{output.stem}_{path_tag}{suffix}")
+        figure.savefig(output_path, dpi=150)
+        plt.close(figure)
+        print(f"Saved -> {output_path}")
+
+
 def cutflow_component(item, prefix, path):
     key = f"{prefix}/{path}/cutflow_weighted"
     if key not in item["root"]:
@@ -215,7 +296,13 @@ def main():
     print()
     print_rate_table(inputs, args.prefix, paths)
 
-    figure, axis = plt.subplots(figsize=(9.5, 6.2))
+    if args.object == "both":
+        if args.overlay_l1:
+            print("WARNING: --overlay-l1 is ignored for --object both")
+        plot_threshold_maps(args, inputs, paths)
+        return
+
+    figure, axis = plt.subplots(figsize=(10, 10))
     plotted = 0
     for index, path in enumerate(paths):
         key = f"{args.prefix}/{path}/pt_{args.object}_triggered_weighted"
@@ -243,7 +330,6 @@ def main():
             label = "L1 seed"
             if len(group["paths"]) != len(paths):
                 labels = [style_for(path, 0)["label"] for path in group["paths"]]
-                label += " (" + ", ".join(labels) + ")"
             color = ("#333333", "#6b6b6b", "#8f8f8f")[index % 3]
             axis.plot(thresholds, rates, color=color, linestyle=":", linewidth=2, label=label)
             axis.fill_between(thresholds, np.maximum(rates - errors, 1.0e-12), rates + errors,
@@ -252,17 +338,17 @@ def main():
     if plotted == 0:
         raise ValueError("No threshold curves were available")
 
+    hep.cms.label("", data=False, com=14, ax=axis, loc=0)
     object_label = "Leading" if args.object == "lead" else "Subleading"
-    axis.set_xlabel(rf"{object_label} $p_{{\mathrm{{T}}}}$ threshold [GeV]", fontsize=13)
-    axis.set_ylabel("Rate [kHz]", fontsize=13)
-    axis.set_title(args.title, fontsize=13)
+    axis.set_xlabel(rf"{object_label} $\tau$ $p_{{\mathrm{{T}}}}$ threshold [GeV]", fontsize=20)
+    axis.set_ylabel("Rate [kHz]", fontsize=20)
+    axis.set_title(args.title, fontsize=20)
     axis.set_yscale("log")
     axis.set_xlim(args.x_min, args.x_max)
     axis.set_ylim(args.y_min, args.y_max)
     axis.yaxis.set_major_formatter(ticker.LogFormatterMathtext())
-    axis.grid(True, which="both", linestyle=":", alpha=0.4)
-    axis.legend(fontsize=9, framealpha=0.9, loc="upper right")
-    axis.axhline(1.0, color="gray", linestyle=":", linewidth=1)
+    axis.grid()
+    axis.legend(fontsize=20, loc="upper right")
     figure.tight_layout()
     figure.savefig(args.out, dpi=150)
     print(f"Saved -> {args.out}")

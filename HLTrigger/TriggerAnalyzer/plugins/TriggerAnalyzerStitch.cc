@@ -29,6 +29,7 @@
 
 // ROOT
 #include "TH1D.h"
+#include "TH2D.h"
 
 class TriggerAnalyzerStitch : public edm::one::EDAnalyzer<edm::one::SharedResources, edm::one::WatchRuns> {
 public:
@@ -88,6 +89,8 @@ private:
     TH1D* ptSubAcceptedWeighted{nullptr};
     TH1D* ptLeadL1SeedWeighted{nullptr};
     TH1D* ptSubL1SeedWeighted{nullptr};
+    TH2D* ptLeadVsSubAcceptedWeighted{nullptr};
+    TH2D* ptLeadVsSubL1SeedWeighted{nullptr};
   };
   std::map<std::string, PathHistos> histos_;
 
@@ -113,7 +116,7 @@ private:
   WeightStatus computeEventWeight(const edm::Event& iEvent, double& weightHz) const;
 
   static std::vector<double> ptBins() {
-    return {0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 70, 80, 90, 100, 120, 140, 160, 200};
+    return {0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 70, 80, 90, 100, 120, 140, 160, 180, 200, 220};
   }
 };
 
@@ -240,10 +243,26 @@ void TriggerAnalyzerStitch::beginJob() {
                                            "Subleading p_{T} | L1 seed objects (weighted);p_{T} [GeV];Rate [Hz]",
                                            nPtBins,
                                            bins.data());
+    h.ptLeadVsSubAcceptedWeighted = dir.make<TH2D>(
+        "pt_lead_vs_sub_triggered_weighted",
+        "Leading vs subleading p_{T} | trigger accept (weighted);Leading p_{T} [GeV];Subleading p_{T} [GeV];Rate [Hz]",
+        nPtBins,
+        bins.data(),
+        nPtBins,
+        bins.data());
+    h.ptLeadVsSubL1SeedWeighted = dir.make<TH2D>(
+        "pt_lead_vs_sub_l1seed_weighted",
+        "Leading vs subleading p_{T} | L1 seed objects (weighted);Leading p_{T} [GeV];Subleading p_{T} [GeV];Rate [Hz]",
+        nPtBins,
+        bins.data(),
+        nPtBins,
+        bins.data());
     h.ptLeadAcceptedWeighted->Sumw2();
     h.ptSubAcceptedWeighted->Sumw2();
     h.ptLeadL1SeedWeighted->Sumw2();
     h.ptSubL1SeedWeighted->Sumw2();
+    h.ptLeadVsSubAcceptedWeighted->Sumw2();
+    h.ptLeadVsSubL1SeedWeighted->Sumw2();
   }
 }
 
@@ -342,6 +361,7 @@ void TriggerAnalyzerStitch::analyze(const edm::Event& iEvent, const edm::EventSe
         }
         if (l1objs.size() >= 2) {
           h.ptSubL1SeedWeighted->Fill(l1objs[1]->pt(), weightHz);
+          h.ptLeadVsSubL1SeedWeighted->Fill(l1objs[0]->pt(), l1objs[1]->pt(), weightHz);
         }
       }
     }
@@ -379,6 +399,7 @@ void TriggerAnalyzerStitch::analyze(const edm::Event& iEvent, const edm::EventSe
       }
       if (objs.size() >= 2) {
         h.ptSubAcceptedWeighted->Fill(objs[1]->pt(), weightHz);
+        h.ptLeadVsSubAcceptedWeighted->Fill(objs[0]->pt(), objs[1]->pt(), weightHz);
       }
     }
   }
